@@ -317,3 +317,82 @@ Built with:
 **Made with 🙏 for the devotional community**
 
 *Questions? Issues? Open a GitHub issue or discussion!*
+
+---
+
+## Testing
+
+This project includes a comprehensive test suite for development and quality assurance.
+
+### Quick Test Run
+
+```bash
+# Install test dependencies
+pip install -r requirements-dev.txt
+
+# Run all tests
+pytest
+
+# Run quick tests only
+./run_tests.sh quick
+
+# Run with coverage
+./run_tests.sh coverage
+```
+
+### Test Types
+
+- **Unit Tests**: Fast, isolated component tests
+- **Integration Tests**: Multi-component workflow tests  
+- **Network Tests**: YouTube download tests (optional)
+
+See [TESTING.md](TESTING.md) for complete testing documentation.
+
+---
+
+## Development
+
+### Setting Up Development Environment
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/bhajan-mixer.git
+cd bhajan-mixer
+
+# Install development dependencies
+pip install -r requirements-dev.txt
+
+# Run tests
+pytest
+
+# Run with coverage
+pytest --cov
+```
+
+### Running Tests
+
+```bash
+# Fast unit tests
+./run_tests.sh unit
+
+# Integration tests
+./run_tests.sh integration
+
+# All tests with coverage
+./run_tests.sh coverage
+```
+
+### Code Quality
+
+```bash
+# Format code
+black bhajan-mixer.py
+
+# Lint
+flake8 bhajan-mixer.py
+pylint bhajan-mixer.py
+
+# Type checking
+mypy bhajan-mixer.py
+```
+

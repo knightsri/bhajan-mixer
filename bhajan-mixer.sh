@@ -86,9 +86,15 @@ fi
 mkdir -p "$OUTPUT_DIR"
 
 # ==========================================
+# Create and mount YouTube cache directory
+# ==========================================
+CACHE_DIR="$(pwd)/.YTCACHE"
+mkdir -p "$CACHE_DIR"
+
+# ==========================================
 # Parse arguments to detect local directories
 # ==========================================
-VOLUME_MOUNTS="-v $OUTPUT_DIR:/app/output"
+VOLUME_MOUNTS="-v $OUTPUT_DIR:/app/output -v $CACHE_DIR:/app/.YTCACHE"
 MOUNT_COUNT=0
 ARGS=()
 
@@ -96,7 +102,7 @@ for arg in "$@"; do
     # Check if argument is a local directory path
     if [[ -d "$arg" ]]; then
         # It's a local directory - mount it
-        ((MOUNT_COUNT++))
+        MOUNT_COUNT=$((MOUNT_COUNT + 1))
         ABS_PATH="$(cd "$arg" && pwd)"
         VOLUME_MOUNTS="$VOLUME_MOUNTS -v $ABS_PATH:/app/mount$MOUNT_COUNT:ro"
         # Replace the argument with the container path

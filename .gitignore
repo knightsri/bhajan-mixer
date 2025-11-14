@@ -1,0 +1,153 @@
+# Bhajan Mixer - Git Ignore File
+
+# === Output Directories ===
+# User-generated audio/video files
+output/
+*.mp3
+*.mp4
+
+# === Cache Directories ===
+# YouTube download cache
+.YTCACHE/
+
+# === Python ===
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# === Docker ===
+# Docker volumes and build cache
+.dockerignore
+
+# === IDE / Editors ===
+# VSCode
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+
+# === OS Files ===
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Linux
+.directory
+.Trash-*
+
+# === Temporary Files ===
+# Temp directories
+tmp/
+temp/
+*.tmp
+
+# Log files
+*.log
+
+# === Test Files ===
+# Test music/video directories (for testing the app)
+test-music/
+test-deep/
+test-*/
+
+# But DO track the tests/ directory (our test suite)
+!tests/
+
+# === Claude Code ===
+# Claude Code workspace files (optional - uncomment if you want to share)
+# .claude/
+
+# === Project Specific ===
+# Local configuration (if you add config file support later)
+.env
+.env.local
+config.local.yml
+*.local
+
+# Backup files
+*.bak
+*.backup
+*~
