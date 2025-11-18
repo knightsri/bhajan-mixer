@@ -363,6 +363,10 @@ Examples:
                        help='Show what would be created without downloading/processing')
     parser.add_argument('--recurse', action='store_true',
                        help='Scan directories recursively (default: top-level only)')
+    parser.add_argument('--LONG-MP3-MAX', type=float, dest='long_mp3_max',
+                       help='Max duration (in minutes) before an MP3 is considered "long"')
+    parser.add_argument('--LONG-MP3-CUTOFF', type=float, dest='long_mp3_cutoff',
+                       help='Duration (in minutes) to keep from long MP3s (must be used with --LONG-MP3-MAX)')
 
     return parser.parse_args()
 
@@ -424,12 +428,16 @@ def create_output_dir(base_dir: str, album_name: str) -> Path:
     return fallback_path
 
 
-def combine_audio(audio_files: List[Path], output_path: Path) -> None:
+def combine_audio(audio_files: List[Path], output_path: Path,
+                  long_mp3_max: Optional[float] = None,
+                  long_mp3_cutoff: Optional[float] = None) -> None:
     """Concatenate multiple audio files into one MP3
 
     Args:
         audio_files: List of MP3 file paths to combine (in order)
         output_path: Where to save the combined MP3 file
+        long_mp3_max: Max duration (in minutes) before an MP3 is considered "long" (optional)
+        long_mp3_cutoff: Duration (in minutes) to keep from long MP3s (optional)
 
     Note:
         Exports at 320kbps quality for best audio fidelity
@@ -439,6 +447,17 @@ def combine_audio(audio_files: List[Path], output_path: Path) -> None:
     for audio_file in audio_files:
         try:
             segment = AudioSegment.from_mp3(str(audio_file))
+
+            # Check if we need to truncate this segment
+            if long_mp3_max is not None and long_mp3_cutoff is not None:
+                duration_minutes = len(segment) / 1000.0 / 60.0  # Convert ms to minutes
+
+                if duration_minutes > long_mp3_max:
+                    # Truncate to first long_mp3_cutoff minutes
+                    cutoff_ms = int(long_mp3_cutoff * 60 * 1000)  # Convert minutes to ms
+                    segment = segment[:cutoff_ms]
+                    print(f"  ✂️  Truncated {audio_file.name} from {duration_minutes:.1f} to {long_mp3_cutoff:.1f} minutes")
+
             combined += segment
         except Exception as e:
             print(f"  ⚠️  Warning: Could not process {audio_file.name}: {e}")
@@ -590,7 +609,9 @@ def rotate_and_combine_videos(sources: List[Source], output_dir: Path, temp_dir:
     return created_count
 
 
-def rotate_and_combine(sources: List[Source], output_dir: Path, temp_dir: Path, album_name: str) -> int:
+def rotate_and_combine(sources: List[Source], output_dir: Path, temp_dir: Path, album_name: str,
+                       long_mp3_max: Optional[float] = None,
+                       long_mp3_cutoff: Optional[float] = None) -> int:
     """Apply circular rotation algorithm and create combined tracks"""
     # Filter sources that have audio files
     audio_sources = [s for s in sources if len(s.files) > 0]
@@ -615,7 +636,7 @@ def rotate_and_combine(sources: List[Source], output_dir: Path, temp_dir: Path, 
         output_file = output_dir / f"track-{track_num:02d}.mp3"
 
         try:
-            combine_audio(audio_files, output_file)
+            combine_audio(audio_files, output_file, long_mp3_max, long_mp3_cutoff)
 
             # Write ID3 tags with metadata
             write_id3_tags(output_file, sources, audio_files, album_name, track_num, total_tracks)
@@ -637,6 +658,19 @@ def main():
     print("🎵 Bhajan Mixer\n")
 
     args = parse_args()
+
+    # Validate LONG-MP3 parameters (both must be provided together)
+    if (args.long_mp3_max is not None) != (args.long_mp3_cutoff is not None):
+        print("❌ Error: --LONG-MP3-MAX and --LONG-MP3-CUTOFF must be used together")
+        print("💡 Please provide both parameters or neither")
+        return 1
+
+    # Auto-adjust LONG-MP3-CUTOFF if it exceeds LONG-MP3-MAX
+    if args.long_mp3_max is not None and args.long_mp3_cutoff is not None:
+        if args.long_mp3_cutoff > args.long_mp3_max:
+            print(f"⚠️  Warning: LONG-MP3-CUTOFF ({args.long_mp3_cutoff} min) > LONG-MP3-MAX ({args.long_mp3_max} min)")
+            print(f"⚠️  Auto-adjusting LONG-MP3-CUTOFF to {args.long_mp3_max} minutes")
+            args.long_mp3_cutoff = args.long_mp3_max
 
     # Handle dry-run mode
     if args.dry_run:
@@ -712,7 +746,8 @@ def main():
         output_dir = create_output_dir(output_base, args.album)
 
         # Apply rotation and create audio tracks
-        audio_created = rotate_and_combine(sources, output_dir, temp_dir, args.album)
+        audio_created = rotate_and_combine(sources, output_dir, temp_dir, args.album,
+                                          args.long_mp3_max, args.long_mp3_cutoff)
 
         # Apply rotation and create video tracks if --mp4out flag is set
         video_created = 0

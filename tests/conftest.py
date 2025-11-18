@@ -54,3 +54,47 @@ def mock_youtube_url():
 def mock_playlist_url():
     """Return a mock YouTube playlist URL"""
     return "https://www.youtube.com/playlist?list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf"
+
+
+@pytest.fixture
+def long_mp3_file(temp_dir):
+    """Create a long MP3 file (5 minutes of silence) for testing"""
+    try:
+        from pydub import AudioSegment
+        from pydub.generators import Sine
+    except ImportError:
+        pytest.skip("pydub not available")
+
+    # Create 5 minutes of silence
+    duration_ms = 5 * 60 * 1000  # 5 minutes in milliseconds
+    silence = AudioSegment.silent(duration=duration_ms)
+
+    mp3_file = temp_dir / "long_song.mp3"
+    silence.export(str(mp3_file), format="mp3", bitrate="320k")
+
+    return mp3_file
+
+
+@pytest.fixture
+def dir_with_long_and_short_mp3s(temp_dir):
+    """Create a directory with both long and short MP3 files"""
+    try:
+        from pydub import AudioSegment
+    except ImportError:
+        pytest.skip("pydub not available")
+
+    music_dir = temp_dir / "mixed_music"
+    music_dir.mkdir()
+
+    # Create 1 long MP3 (5 minutes)
+    long_silence = AudioSegment.silent(duration=5 * 60 * 1000)
+    long_file = music_dir / "long_song.mp3"
+    long_silence.export(str(long_file), format="mp3", bitrate="320k")
+
+    # Create 2 short MP3s (30 seconds each)
+    short_silence = AudioSegment.silent(duration=30 * 1000)
+    for i in range(1, 3):
+        short_file = music_dir / f"short_song{i}.mp3"
+        short_silence.export(str(short_file), format="mp3", bitrate="320k")
+
+    return music_dir
