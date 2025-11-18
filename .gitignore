@@ -147,6 +147,9 @@ test-*/
 config.local.yml
 *.local
 
+# YouTube authentication cookies
+cookies.txt
+
 # Backup files
 *.bak
 *.backup

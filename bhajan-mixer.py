@@ -82,7 +82,7 @@ class Source:
         """Check if YouTube URL is a playlist"""
         return 'list=' in url
 
-    def download_or_scan(self, temp_dir: Path, recurse: bool = False, mp4out: bool = False) -> bool:
+    def download_or_scan(self, temp_dir: Path, recurse: bool = False, mp4out: bool = False, cookies: Optional[str] = None) -> bool:
         """Download from YouTube or scan directory. Returns True if successful."""
         if self.is_youtube_url(self.location):
             # Create subdirectory for this source to avoid file mixing
@@ -90,11 +90,11 @@ class Source:
             source_temp_dir.mkdir(exist_ok=True)
 
             # Download audio (always)
-            audio_success = self._download_youtube(source_temp_dir)
+            audio_success = self._download_youtube(source_temp_dir, cookies)
 
             # Download video if --mp4out flag is set
             if mp4out:
-                video_success = self._download_youtube_video(source_temp_dir)
+                video_success = self._download_youtube_video(source_temp_dir, cookies)
             else:
                 video_success = False
 
@@ -138,7 +138,7 @@ class Source:
         except Exception:
             pass  # Don't fail if caching doesn't work
 
-    def _download_youtube(self, temp_dir: Path) -> bool:
+    def _download_youtube(self, temp_dir: Path, cookies: Optional[str] = None) -> bool:
         """Download YouTube video(s) as MP3, using cache when available"""
         is_playlist = self.is_playlist_url(self.location)
         self.source_type = "YouTube Playlist" if is_playlist else "YouTube Video"
@@ -155,6 +155,10 @@ class Source:
             'no_warnings': True,
             'ignoreerrors': True,  # Skip unavailable videos
         }
+
+        # Add cookies if provided
+        if cookies:
+            ydl_opts['cookiefile'] = cookies
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -235,7 +239,7 @@ class Source:
         except Exception as e:
             return False
 
-    def _download_youtube_video(self, temp_dir: Path) -> bool:
+    def _download_youtube_video(self, temp_dir: Path, cookies: Optional[str] = None) -> bool:
         """Download YouTube video(s) as MP4"""
         is_playlist = self.is_playlist_url(self.location)
 
@@ -246,6 +250,10 @@ class Source:
             'no_warnings': True,
             'ignoreerrors': True,
         }
+
+        # Add cookies if provided
+        if cookies:
+            ydl_opts['cookiefile'] = cookies
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -367,6 +375,8 @@ Examples:
                        help='Max duration (in minutes) before an MP3 is considered "long"')
     parser.add_argument('--LONG-MP3-CUTOFF', type=float, dest='long_mp3_cutoff',
                        help='Duration (in minutes) to keep from long MP3s (must be used with --LONG-MP3-MAX)')
+    parser.add_argument('--cookies', type=str, dest='cookies',
+                       help='Path to cookies file for YouTube authentication (for private/restricted videos)')
 
     return parser.parse_args()
 
@@ -698,7 +708,7 @@ def main():
                 print(f"  ⚠️  Skipped (dry-run mode doesn't download YouTube)")
                 continue
 
-            if source.download_or_scan(temp_dir, recurse=args.recurse, mp4out=args.mp4out):
+            if source.download_or_scan(temp_dir, recurse=args.recurse, mp4out=args.mp4out, cookies=args.cookies):
                 audio_count = len(source.files)
                 video_count = len(source.video_files)
                 failed_msg = f" ({source.failed_count} failed)" if source.failed_count > 0 else ""
