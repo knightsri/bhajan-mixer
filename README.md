@@ -10,6 +10,9 @@ Create varied listening experiences by rotating through multiple YouTube playlis
 - 🎬 **Video Support**: Optional MP4 output with normalized quality
 - 📁 **Flexible Input**: YouTube URLs, playlists, and local directories
 - 🎼 **Rich Metadata**: Automatic ID3 tags with album, track, and title info
+- 🔒 **Private Video Support**: Cookie-based authentication for restricted content
+- ✂️ **Smart Truncation**: Optional MP3 duration limiting for long tracks
+- 💾 **Intelligent Caching**: Automatic YouTube download caching to speed up re-runs
 - 🚀 **Production Ready**: Docker support, error handling, progress tracking
 - 🧹 **Clean Operation**: Automatic cleanup of intermediate files
 
@@ -87,6 +90,9 @@ bhajan-mixer [OPTIONS] <source1> <source2> ... <sourceN>
 | `--mp4out` | Generate MP4 video files | Audio only |
 | `--dry-run` | Preview without downloading | Execute normally |
 | `--recurse` | Scan directories recursively | Top-level only |
+| `--cookies <file>` | Path to cookies.txt for private/restricted YouTube videos | None |
+| `--LONG-MP3-MAX <minutes>` | Consider MP3s longer than this "long" | No truncation |
+| `--LONG-MP3-CUTOFF <minutes>` | Keep only this duration from long MP3s | Must use with MAX |
 
 ### Source Types
 
@@ -211,6 +217,25 @@ bhajan-mixer --dry-run --album "Test Mix" \
   /local/music
 ```
 
+### Private/Restricted YouTube Videos
+```bash
+# Export cookies from your browser using a browser extension
+# Save as cookies.txt in Netscape format
+
+bhajan-mixer --album "Private Content" \
+  --cookies /path/to/cookies.txt \
+  https://youtube.com/playlist?list=PLxxx
+```
+
+### Truncate Long MP3s
+```bash
+# Keep only first 10 minutes of MP3s longer than 15 minutes
+bhajan-mixer --album "Shortened Mix" \
+  --LONG-MP3-MAX 15 \
+  --LONG-MP3-CUTOFF 10 \
+  https://youtube.com/playlist?list=PLxxx
+```
+
 ## Error Handling
 
 Bhajan Mixer gracefully handles:
@@ -246,6 +271,17 @@ Console output keeps you informed:
 
 ## Advanced Usage
 
+### YouTube Download Caching
+
+Bhajan Mixer automatically caches YouTube downloads in the `.YTCACHE` directory to improve performance on re-runs:
+
+- **Location**: `.YTCACHE` in the project directory
+- **Behavior**: Downloaded videos are cached and reused across runs
+- **Benefits**: Faster processing when reusing the same YouTube sources
+- **Management**: The cache persists between runs; you can safely delete `.YTCACHE` to clear it
+
+The wrapper scripts (`bhajan-mixer.bat` and `bhajan-mixer.sh`) automatically mount this cache directory.
+
 ### Recursive Directory Scanning
 ```bash
 bhajan-mixer --album "Deep Collection" --recurse /music/root
@@ -278,6 +314,22 @@ Common causes:
 - Private/deleted videos
 
 Solution: Bhajan Mixer automatically skips these and continues.
+
+### Private or Restricted Videos
+For private playlists or age-restricted content:
+
+1. **Export cookies from your browser**:
+   - Install a browser extension (e.g., "Get cookies.txt" for Chrome/Firefox)
+   - Log into YouTube in your browser
+   - Export cookies to `cookies.txt` (Netscape format)
+
+2. **Use the --cookies flag**:
+   ```bash
+   bhajan-mixer --album "Private Mix" --cookies /path/to/cookies.txt \
+     https://youtube.com/playlist?list=PLxxx
+   ```
+
+3. **Note**: Cookies file must be readable by the Docker container. The wrapper scripts handle this automatically.
 
 ### Different MP3 vs MP4 counts
 This is expected behavior when sources have different media availability:
