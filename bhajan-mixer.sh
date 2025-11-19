@@ -92,7 +92,7 @@ CACHE_DIR="$(pwd)/.YTCACHE"
 mkdir -p "$CACHE_DIR"
 
 # ==========================================
-# Parse arguments to detect local directories
+# Parse arguments to detect local directories and files
 # ==========================================
 VOLUME_MOUNTS="-v $OUTPUT_DIR:/app/output -v $CACHE_DIR:/app/.YTCACHE"
 MOUNT_COUNT=0
@@ -107,8 +107,15 @@ for arg in "$@"; do
         VOLUME_MOUNTS="$VOLUME_MOUNTS -v $ABS_PATH:/app/mount$MOUNT_COUNT:ro"
         # Replace the argument with the container path
         ARGS+=("/app/mount$MOUNT_COUNT")
+    elif [[ -f "$arg" ]]; then
+        # It's a local file - mount it
+        MOUNT_COUNT=$((MOUNT_COUNT + 1))
+        ABS_PATH="$(cd "$(dirname "$arg")" && pwd)/$(basename "$arg")"
+        VOLUME_MOUNTS="$VOLUME_MOUNTS -v $ABS_PATH:/app/mount$MOUNT_COUNT:ro"
+        # Replace the argument with the container path
+        ARGS+=("/app/mount$MOUNT_COUNT")
     else
-        # Not a local directory - pass as-is (URL or flag)
+        # Not a local path - pass as-is (URL or flag)
         ARGS+=("$arg")
     fi
 done

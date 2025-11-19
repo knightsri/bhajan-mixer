@@ -156,9 +156,14 @@ class Source:
             'ignoreerrors': True,  # Skip unavailable videos
         }
 
-        # Add cookies if provided
+        # Add cookies if provided - copy to /tmp for read-write access
         if cookies:
-            ydl_opts['cookiefile'] = cookies
+            import shutil
+            cookies_tmp = '/tmp/cookies.txt'
+            print(f"  📝 Copying cookies file to {cookies_tmp} for read-write access...")
+            shutil.copy2(cookies, cookies_tmp)
+            ydl_opts['cookiefile'] = cookies_tmp
+            print(f"  🔑 Using cookies from: {cookies_tmp}")
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -251,9 +256,12 @@ class Source:
             'ignoreerrors': True,
         }
 
-        # Add cookies if provided
+        # Add cookies if provided - copy to /tmp for read-write access
         if cookies:
-            ydl_opts['cookiefile'] = cookies
+            import shutil
+            cookies_tmp = '/tmp/cookies.txt'
+            shutil.copy2(cookies, cookies_tmp)
+            ydl_opts['cookiefile'] = cookies_tmp
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:

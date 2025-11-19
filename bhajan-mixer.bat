@@ -10,6 +10,7 @@ REM ==========================================
 set IMAGE_NAME=bhajan-mixer
 set OUTPUT_DIR=%CD%\output
 set CONTAINER_NAME=bhajan-mixer-run
+set CACHE_DIR=%CD%\.YTCACHE
 
 REM ==========================================
 REM Check if Docker is installed
@@ -67,33 +68,40 @@ if not exist "%OUTPUT_DIR%" (
 )
 
 REM ==========================================
-REM Parse arguments to detect local directories
+REM Create YouTube cache directory if it doesn't exist
 REM ==========================================
-set VOLUME_MOUNTS=-v "%OUTPUT_DIR%":/app/output
+if not exist "%CACHE_DIR%" (
+    mkdir "%CACHE_DIR%"
+)
+
+REM ==========================================
+REM Parse arguments to detect local directories and files
+REM ==========================================
+set VOLUME_MOUNTS=-v "%OUTPUT_DIR%":/app/output -v "%CACHE_DIR%":/app/.YTCACHE
 set MOUNT_COUNT=0
 
-REM Check each argument for local directory paths
+REM Check each argument for local directory paths or files
 set ARGS=
 for %%a in (%*) do (
     set ARG=%%~a
-    
-    REM Check if it looks like a local path (contains : or \ or starts with /)
-    echo !ARG! | findstr /C:":" /C:"\" /C:"/" >nul
-    if not errorlevel 1 (
-        REM It might be a path - check if it exists
-        if exist "!ARG!" (
-            REM It's a local directory - mount it
-            set /a MOUNT_COUNT+=1
-            set "ABS_PATH=%%~fa"
-            set VOLUME_MOUNTS=!VOLUME_MOUNTS! -v "!ABS_PATH!":/app/mount!MOUNT_COUNT!:ro
-            REM Replace the argument with the container path
-            set ARGS=!ARGS! /app/mount!MOUNT_COUNT!
-        ) else (
-            REM Not a path or doesn't exist - pass as-is
-            set ARGS=!ARGS! "!ARG!"
-        )
+
+    REM Check if it's a directory
+    if exist "!ARG!\*" (
+        REM It's a directory - mount it
+        set /a MOUNT_COUNT+=1
+        set "ABS_PATH=%%~fa"
+        set VOLUME_MOUNTS=!VOLUME_MOUNTS! -v "!ABS_PATH!":/app/mount!MOUNT_COUNT!:ro
+        REM Replace the argument with the container path
+        set ARGS=!ARGS! /app/mount!MOUNT_COUNT!
+    ) else if exist "!ARG!" (
+        REM It's a file - mount it
+        set /a MOUNT_COUNT+=1
+        set "ABS_PATH=%%~fa"
+        set VOLUME_MOUNTS=!VOLUME_MOUNTS! -v "!ABS_PATH!":/app/mount!MOUNT_COUNT!:ro
+        REM Replace the argument with the container path
+        set ARGS=!ARGS! /app/mount!MOUNT_COUNT!
     ) else (
-        REM Not a path - pass as-is (likely URL or flag)
+        REM Not a local path - pass as-is (URL or flag)
         set ARGS=!ARGS! "!ARG!"
     )
 )

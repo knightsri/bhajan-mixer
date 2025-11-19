@@ -19,5 +19,5 @@ COPY bhajan-mixer.py .
 # Create output volume
 VOLUME ["/app/output"]
 
-# Set entrypoint to run the Python application
-ENTRYPOINT ["python", "bhajan-mixer.py"]
+# Set entrypoint to run the Python application with unbuffered output
+ENTRYPOINT ["python", "-u", "bhajan-mixer.py"]
