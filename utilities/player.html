@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#667eea">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="apple-touch-icon" href="./icon-192.png">
+    <title>Player</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .input-section {
+            margin-bottom: 20px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .player {
+            display: none;
+        }
+
+        .player.active {
+            display: block;
+        }
+
+        .now-playing {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .track-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            word-break: break-word;
+        }
+
+        .track-info {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .progress-container {
+            background: rgba(255, 255, 255, 0.2);
+            height: 6px;
+            border-radius: 3px;
+            margin-top: 15px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            background: white;
+            height: 100%;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .control-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: white;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .control-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .control-btn.play-pause {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-size: 32px;
+        }
+
+        .playlist {
+            max-height: 300px;
+            overflow-y: auto;
+            border-radius: 10px;
+            background: #f8f9fa;
+            padding: 10px;
+        }
+
+        .playlist-item {
+            padding: 12px;
+            margin-bottom: 8px;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .playlist-item:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+
+        .playlist-item.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .playlist-item-number {
+            font-weight: 600;
+            opacity: 0.6;
+            min-width: 25px;
+        }
+
+        .playlist-item.active .playlist-item-number {
+            opacity: 1;
+        }
+
+        .status {
+            text-align: center;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+
+        .status.loading {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+            }
+
+            .control-btn {
+                width: 50px;
+                height: 50px;
+                font-size: 20px;
+            }
+
+            .control-btn.play-pause {
+                width: 70px;
+                height: 70px;
+                font-size: 28px;
+            }
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="input-section" id="inputSection">
+            <h2 style="margin-bottom: 20px; color: #333; text-align: center;">Enter Album</h2>
+            <input type="text" id="albumInput" placeholder="Album name">
+            <button onclick="loadAlbum()">Load Album</button>
+        </div>
+
+        <div class="player" id="player">
+            <div class="now-playing">
+                <div class="track-title" id="trackTitle">Loading...</div>
+                <div class="track-info" id="trackInfo">-- / --</div>
+                <div class="progress-container">
+                    <div class="progress-bar" id="progressBar"></div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="control-btn" onclick="previousTrack()">⏮</button>
+                <button class="control-btn play-pause" onclick="togglePlay()" id="playPauseBtn">▶</button>
+                <button class="control-btn" onclick="nextTrack()">⏭</button>
+            </div>
+
+            <div class="playlist" id="playlist"></div>
+        </div>
+
+        <div class="status hidden" id="status"></div>
+    </div>
+
+    <audio id="audio" preload="auto"></audio>
+
+    <script>
+        const _0x4a2b = ['bWluaXVybC5zaGFsdXNyaS5jb20='];
+        const _0x1f3d = atob(_0x4a2b[0]);
+
+        let playlist = [];
+        let currentIndex = 0;
+        let isPlaying = false;
+        let audioCache;
+        const audio = document.getElementById('audio');
+        const dbName = 'ap';
+        const storeName = 'af';
+
+        async function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(dbName, 1);
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => resolve(request.result);
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains(storeName)) {
+                        db.createObjectStore(storeName);
+                    }
+                };
+            });
+        }
+
+        async function getCachedAudio(url) {
+            try {
+                const db = await initDB();
+                const transaction = db.transaction([storeName], 'readonly');
+                const store = transaction.objectStore(storeName);
+                const request = store.get(url);
+
+                return new Promise((resolve, reject) => {
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(request.error);
+                });
+            } catch (e) {
+                return null;
+            }
+        }
+
+        async function cacheAudio(url, blob) {
+            try {
+                const db = await initDB();
+                const transaction = db.transaction([storeName], 'readwrite');
+                const store = transaction.objectStore(storeName);
+                store.put(blob, url);
+            } catch (e) {
+                console.warn('Cache failed', e);
+            }
+        }
+
+        async function loadAudioWithCache(url) {
+            let cached = await getCachedAudio(url);
+            if (cached) {
+                return URL.createObjectURL(cached);
+            }
+
+            try {
+                const response = await fetch(url, { mode: 'cors' });
+                const blob = await response.blob();
+                await cacheAudio(url, blob);
+                return URL.createObjectURL(blob);
+            } catch (e) {
+                return url;
+            }
+        }
+
+        function showStatus(message, type = 'loading') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.classList.remove('hidden');
+        }
+
+        function hideStatus() {
+            document.getElementById('status').classList.add('hidden');
+        }
+
+        function getUrlParameter(name) {
+            const params = new URLSearchParams(window.location.search);
+            return params.get(name);
+        }
+
+        async function loadAlbum() {
+            const albumInput = document.getElementById('albumInput');
+            const album = albumInput.value.trim() || getUrlParameter('album');
+
+            if (!album) {
+                showStatus('Please enter an album name', 'error');
+                return;
+            }
+
+            showStatus('Loading album...', 'loading');
+
+            try {
+                const shortUrl = `${'https'}://${_0x1f3d}/${album}`;
+                const response = await fetch(shortUrl, { redirect: 'follow' });
+                const finalUrl = response.url;
+
+                if (!finalUrl.includes('drive.google.com')) {
+                    throw new Error('Invalid redirect');
+                }
+
+                const driveId = extractDriveId(finalUrl);
+                if (!driveId) {
+                    throw new Error('Could not extract Drive folder ID');
+                }
+
+                await loadDriveFolder(driveId);
+
+                document.getElementById('inputSection').style.display = 'none';
+                document.getElementById('player').classList.add('active');
+                hideStatus();
+            } catch (error) {
+                showStatus('Failed to load album. Please check the album name.', 'error');
+                console.error('Load error:', error);
+            }
+        }
+
+        function extractDriveId(url) {
+            const patterns = [
+                /\/folders\/([a-zA-Z0-9_-]+)/,
+                /id=([a-zA-Z0-9_-]+)/,
+                /[-\w]{25,}/
+            ];
+
+            for (const pattern of patterns) {
+                const match = url.match(pattern);
+                if (match) return match[1] || match[0];
+            }
+            return null;
+        }
+
+        async function loadDriveFolder(folderId) {
+            showStatus('Fetching files...', 'loading');
+
+            try {
+                const apiUrl = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+mimeType+contains+'audio/'&key=AIzaSyDummyKeyNotReal&fields=files(id,name,mimeType)`;
+
+                const listUrl = `https://drive.google.com/embeddedfolderview?id=${folderId}`;
+                const response = await fetch(listUrl);
+                const html = await response.text();
+
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+
+                const files = [];
+                const links = doc.querySelectorAll('a[href*="/file/d/"]');
+
+                links.forEach(link => {
+                    const href = link.getAttribute('href');
+                    const match = href.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+                    if (match) {
+                        const fileId = match[1];
+                        let fileName = link.textContent.trim();
+
+                        if (!fileName || fileName.length < 2) {
+                            const parent = link.closest('div[data-target]');
+                            if (parent) {
+                                fileName = parent.getAttribute('data-target') || `Track ${files.length + 1}`;
+                            }
+                        }
+
+                        if (fileName.toLowerCase().includes('.mp3') ||
+                            fileName.toLowerCase().includes('audio') ||
+                            !fileName.includes('.')) {
+                            files.push({
+                                id: fileId,
+                                name: fileName.replace(/\.(mp3|m4a|wav)$/i, ''),
+                                url: `https://drive.google.com/uc?export=download&id=${fileId}`
+                            });
+                        }
+                    }
+                });
+
+                if (files.length === 0) {
+                    const scriptTags = doc.querySelectorAll('script');
+                    scriptTags.forEach(script => {
+                        const content = script.textContent;
+                        const matches = content.matchAll(/\["([a-zA-Z0-9_-]{25,})"[^\]]*"([^"]*\.mp3[^"]*)"/gi);
+                        for (const match of matches) {
+                            files.push({
+                                id: match[1],
+                                name: match[2].replace(/\.(mp3|m4a|wav)$/i, ''),
+                                url: `https://drive.google.com/uc?export=download&id=${match[1]}`
+                            });
+                        }
+                    });
+                }
+
+                if (files.length === 0) {
+                    throw new Error('No audio files found');
+                }
+
+                playlist = files;
+                renderPlaylist();
+                loadTrack(0);
+                hideStatus();
+            } catch (error) {
+                showStatus('Failed to load files from Drive folder', 'error');
+                console.error('Drive load error:', error);
+            }
+        }
+
+        function renderPlaylist() {
+            const playlistEl = document.getElementById('playlist');
+            playlistEl.innerHTML = playlist.map((track, index) => `
+                <div class="playlist-item ${index === currentIndex ? 'active' : ''}"
+                     onclick="loadTrack(${index})">
+                    <span class="playlist-item-number">${index + 1}</span>
+                    <span>${track.name}</span>
+                </div>
+            `).join('');
+        }
+
+        async function loadTrack(index) {
+            currentIndex = index;
+            const track = playlist[currentIndex];
+
+            document.getElementById('trackTitle').textContent = track.name;
+            document.getElementById('trackInfo').textContent = `${currentIndex + 1} / ${playlist.length}`;
+
+            renderPlaylist();
+
+            const audioUrl = await loadAudioWithCache(track.url);
+            audio.src = audioUrl;
+
+            if (isPlaying) {
+                audio.play().catch(e => console.error('Play error:', e));
+            }
+        }
+
+        function togglePlay() {
+            if (isPlaying) {
+                audio.pause();
+                isPlaying = false;
+                document.getElementById('playPauseBtn').textContent = '▶';
+            } else {
+                audio.play().catch(e => {
+                    console.error('Play error:', e);
+                    showStatus('Playback failed. Tap play again.', 'error');
+                    setTimeout(hideStatus, 2000);
+                });
+                isPlaying = true;
+                document.getElementById('playPauseBtn').textContent = '⏸';
+            }
+        }
+
+        function nextTrack() {
+            currentIndex = (currentIndex + 1) % playlist.length;
+            loadTrack(currentIndex);
+        }
+
+        function previousTrack() {
+            currentIndex = (currentIndex - 1 + playlist.length) % playlist.length;
+            loadTrack(currentIndex);
+        }
+
+        audio.addEventListener('ended', () => {
+            nextTrack();
+        });
+
+        audio.addEventListener('timeupdate', () => {
+            if (audio.duration) {
+                const progress = (audio.currentTime / audio.duration) * 100;
+                document.getElementById('progressBar').style.width = progress + '%';
+            }
+        });
+
+        audio.addEventListener('error', (e) => {
+            console.error('Audio error:', e);
+            showStatus('Playback error. Trying next track...', 'error');
+            setTimeout(() => {
+                nextTrack();
+                hideStatus();
+            }, 1500);
+        });
+
+        document.getElementById('albumInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                loadAlbum();
+            }
+        });
+
+        window.addEventListener('load', () => {
+            const album = getUrlParameter('album');
+            if (album) {
+                document.getElementById('albumInput').value = album;
+                loadAlbum();
+            }
+
+            // Register service worker for PWA
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('SW registered', reg))
+                    .catch(err => console.log('SW registration failed', err));
+            }
+        });
+    </script>
+</body>
+</html>
