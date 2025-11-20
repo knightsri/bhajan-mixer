@@ -251,8 +251,11 @@
     <div class="container">
         <div class="input-section" id="inputSection">
             <h2 style="margin-bottom: 20px; color: #333; text-align: center;">Enter Album</h2>
-            <input type="text" id="albumInput" placeholder="Album name">
+            <input type="text" id="albumInput" placeholder="Album name or Google Drive folder ID/URL">
             <button onclick="loadAlbum()">Load Album</button>
+            <div style="margin-top: 15px; text-align: center; font-size: 12px; color: #666;">
+                Enter album name, Drive folder ID, or full Drive folder URL
+            </div>
         </div>
 
         <div class="player" id="player">
@@ -375,15 +378,45 @@
             showStatus('Loading album...', 'loading');
 
             try {
-                const shortUrl = `${'https'}://${_0x1f3d}/${album}`;
-                const response = await fetch(shortUrl, { redirect: 'follow' });
-                const finalUrl = response.url;
+                let driveId = null;
 
-                if (!finalUrl.includes('drive.google.com')) {
-                    throw new Error('Invalid redirect');
+                // Check if input is already a Drive URL or ID
+                if (album.includes('drive.google.com')) {
+                    driveId = extractDriveId(album);
+                } else if (album.match(/^[a-zA-Z0-9_-]{25,}$/)) {
+                    // Looks like a Drive folder ID
+                    driveId = album;
+                } else {
+                    // Try to fetch via miniurl
+                    try {
+                        const shortUrl = `${'https'}://${_0x1f3d}/${album}`;
+                        const response = await fetch(shortUrl, {
+                            redirect: 'follow',
+                            mode: 'cors'
+                        });
+
+                        const finalUrl = response.url;
+
+                        if (!finalUrl.includes('drive.google.com')) {
+                            throw new Error('Invalid redirect');
+                        }
+
+                        driveId = extractDriveId(finalUrl);
+                    } catch (corsError) {
+                        if (corsError.name === 'TypeError' && corsError.message.includes('CORS')) {
+                            showStatus(
+                                'CORS error: Please configure miniurl.shalusri.com server with proper CORS headers. ' +
+                                'See utilities/miniurl-htaccess for configuration. ' +
+                                'Or use a Google Drive folder URL/ID directly.',
+                                'error'
+                            );
+                            console.error('CORS configuration needed on miniurl server');
+                            return;
+                        }
+                        throw corsError;
+                    }
                 }
 
-                const driveId = extractDriveId(finalUrl);
                 if (!driveId) {
                     throw new Error('Could not extract Drive folder ID');
                 }
@@ -394,7 +427,9 @@
                 document.getElementById('player').classList.add('active');
                 hideStatus();
             } catch (error) {
-                showStatus('Failed to load album. Please check the album name.', 'error');
+                if (!error.message.includes('CORS')) {
+                    showStatus('Failed to load album. Please check the input and try again.', 'error');
+                }
                 console.error('Load error:', error);
             }
         }
