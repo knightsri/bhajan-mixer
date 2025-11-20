@@ -1,0 +1,27 @@
+# CORS Configuration for miniurl.shalusri.com
+# This file should be copied to the miniurl.shalusri.com server as .htaccess
+
+# Enable CORS for all origins (or specify bhajans.shalusri.com)
+<IfModule mod_headers.c>
+    # Allow requests from bhajans.shalusri.com (or use * for all origins)
+    Header set Access-Control-Allow-Origin "*"
+
+    # Allow specific methods
+    Header set Access-Control-Allow-Methods "GET, OPTIONS"
+
+    # Allow specific headers
+    Header set Access-Control-Allow-Headers "Content-Type, Authorization"
+
+    # Allow credentials (if needed)
+    # Header set Access-Control-Allow-Credentials "true"
+
+    # Cache preflight requests for 1 hour
+    Header set Access-Control-Max-Age "3600"
+</IfModule>
+
+# Handle OPTIONS requests (preflight)
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_METHOD} OPTIONS
+    RewriteRule ^(.*)$ $1 [R=200,L]
+</IfModule>
