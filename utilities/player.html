@@ -332,19 +332,16 @@
         }
 
         async function loadAudioWithCache(url) {
+            // Check if we have a cached version
             let cached = await getCachedAudio(url);
             if (cached) {
                 return URL.createObjectURL(cached);
             }
 
-            try {
-                const response = await fetch(url, { mode: 'cors' });
-                const blob = await response.blob();
-                await cacheAudio(url, blob);
-                return URL.createObjectURL(blob);
-            } catch (e) {
-                return url;
-            }
+            // For Google Drive URLs, just return the direct URL
+            // The audio element can load it without CORS restrictions
+            // We'll attempt to cache it after successful playback
+            return url;
         }
 
         function showStatus(message, type = 'loading') {
@@ -421,61 +418,38 @@
             showStatus('Fetching files...', 'loading');
 
             try {
-                const apiUrl = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+mimeType+contains+'audio/'&key=AIzaSyDummyKeyNotReal&fields=files(id,name,mimeType)`;
+                // Use Google Drive API to list files in the public folder
+                // You need to replace this with your own API key from Google Cloud Console
+                // Create one at: https://console.cloud.google.com/apis/credentials
+                const API_KEY = 'YOUR_GOOGLE_DRIVE_API_KEY_HERE';
 
-                const listUrl = `https://drive.google.com/embeddedfolderview?id=${folderId}`;
-                const response = await fetch(listUrl);
-                const html = await response.text();
+                const apiUrl = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents&key=${API_KEY}&fields=files(id,name,mimeType)&orderBy=name`;
 
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
+                const response = await fetch(apiUrl);
 
+                if (!response.ok) {
+                    throw new Error(`API request failed: ${response.status}`);
+                }
+
+                const data = await response.json();
                 const files = [];
-                const links = doc.querySelectorAll('a[href*="/file/d/"]');
 
-                links.forEach(link => {
-                    const href = link.getAttribute('href');
-                    const match = href.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-                    if (match) {
-                        const fileId = match[1];
-                        let fileName = link.textContent.trim();
-
-                        if (!fileName || fileName.length < 2) {
-                            const parent = link.closest('div[data-target]');
-                            if (parent) {
-                                fileName = parent.getAttribute('data-target') || `Track ${files.length + 1}`;
-                            }
-                        }
-
-                        if (fileName.toLowerCase().includes('.mp3') ||
-                            fileName.toLowerCase().includes('audio') ||
-                            !fileName.includes('.')) {
+                // Filter for audio files
+                if (data.files && data.files.length > 0) {
+                    data.files.forEach(file => {
+                        // Check if it's an audio file
+                        if (file.mimeType && file.mimeType.startsWith('audio/')) {
                             files.push({
-                                id: fileId,
-                                name: fileName.replace(/\.(mp3|m4a|wav)$/i, ''),
-                                url: `https://drive.google.com/uc?export=download&id=${fileId}`
-                            });
-                        }
-                    }
-                });
-
-                if (files.length === 0) {
-                    const scriptTags = doc.querySelectorAll('script');
-                    scriptTags.forEach(script => {
-                        const content = script.textContent;
-                        const matches = content.matchAll(/\["([a-zA-Z0-9_-]{25,})"[^\]]*"([^"]*\.mp3[^"]*)"/gi);
-                        for (const match of matches) {
-                            files.push({
-                                id: match[1],
-                                name: match[2].replace(/\.(mp3|m4a|wav)$/i, ''),
-                                url: `https://drive.google.com/uc?export=download&id=${match[1]}`
+                                id: file.id,
+                                name: file.name.replace(/\.(mp3|m4a|wav|ogg|flac)$/i, ''),
+                                url: `https://drive.google.com/uc?export=download&id=${file.id}`
                             });
                         }
                     });
                 }
 
                 if (files.length === 0) {
-                    throw new Error('No audio files found');
+                    throw new Error('No audio files found in this folder. Make sure the folder is publicly accessible.');
                 }
 
                 playlist = files;
@@ -483,7 +457,7 @@
                 loadTrack(0);
                 hideStatus();
             } catch (error) {
-                showStatus('Failed to load files from Drive folder', 'error');
+                showStatus('Failed to load files from Drive folder. Check that the folder is public and you have a valid API key.', 'error');
                 console.error('Drive load error:', error);
             }
         }
