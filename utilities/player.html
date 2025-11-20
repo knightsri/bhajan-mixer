@@ -251,11 +251,12 @@
     <div class="container">
         <div class="input-section" id="inputSection">
             <h2 style="margin-bottom: 20px; color: #333; text-align: center;">Google Drive Album Player</h2>
-            <input type="text" id="albumInput" placeholder="URL to playlist.json file">
+            <input type="text" id="proxyUrlInput" placeholder="Proxy server URL (e.g., http://localhost:5000)" style="margin-bottom: 10px;">
+            <input type="text" id="albumInput" placeholder="Google Drive folder ID or URL">
             <button onclick="loadAlbum()">Load Album</button>
             <div style="margin-top: 15px; text-align: center; font-size: 12px; color: #666;">
-                Enter the URL to your playlist.json file<br>
-                <a href="#" onclick="showHelp(); return false;" style="color: #667eea;">How to create a playlist.json?</a>
+                Enter your proxy server URL and Google Drive folder ID/URL<br>
+                <a href="#" onclick="showHelp(); return false;" style="color: #667eea;">How does this work?</a>
             </div>
         </div>
 
@@ -363,90 +364,119 @@
 
         async function loadAlbum() {
             const albumInput = document.getElementById('albumInput');
-            const playlistUrl = albumInput.value.trim() || getUrlParameter('playlist');
+            const proxyUrlInput = document.getElementById('proxyUrlInput');
 
-            if (!playlistUrl) {
-                showStatus('Please enter a playlist.json URL', 'error');
+            const folderInput = albumInput.value.trim() || getUrlParameter('folder');
+            let proxyUrl = proxyUrlInput.value.trim() || getUrlParameter('proxy') || localStorage.getItem('proxyUrl') || 'http://localhost:5000';
+
+            if (!folderInput) {
+                showStatus('Please enter a Google Drive folder ID or URL', 'error');
                 return;
+            }
+
+            // Save proxy URL for next time
+            if (proxyUrlInput.value.trim()) {
+                localStorage.setItem('proxyUrl', proxyUrl);
             }
 
             showStatus('Loading album...', 'loading');
 
             try {
-                await loadPlaylistFromJson(playlistUrl);
+                // Extract folder ID from URL or use as-is
+                let folderId = folderInput;
+                if (folderInput.includes('drive.google.com')) {
+                    folderId = extractFolderId(folderInput);
+                }
+
+                if (!folderId) {
+                    throw new Error('Could not extract folder ID');
+                }
+
+                await loadFromProxy(proxyUrl, folderId);
 
                 document.getElementById('inputSection').style.display = 'none';
                 document.getElementById('player').classList.add('active');
                 hideStatus();
             } catch (error) {
-                showStatus('Failed to load playlist. Make sure the JSON file is accessible and properly formatted.', 'error');
+                showStatus('Failed to load album. Check proxy server and folder access.', 'error');
                 console.error('Load error:', error);
             }
         }
 
+        function extractFolderId(url) {
+            const patterns = [
+                /\/folders\/([a-zA-Z0-9_-]+)/,
+                /id=([a-zA-Z0-9_-]+)/,
+            ];
+
+            for (const pattern of patterns) {
+                const match = url.match(pattern);
+                if (match) return match[1];
+            }
+
+            // If no pattern matches, check if it's already a folder ID
+            if (url.match(/^[a-zA-Z0-9_-]{25,}$/)) {
+                return url;
+            }
+
+            return null;
+        }
+
         function showHelp() {
-            const helpMessage = `Create a playlist.json file with this format:
+            const helpMessage = `How this works:
 
-[
-  {"id": "FILE_ID_1", "name": "Song Name 1"},
-  {"id": "FILE_ID_2", "name": "Song Name 2"}
-]
+1. Run the proxy server:
+   python utilities/proxy.py
 
-Steps:
-1. Upload MP3s to Google Drive
-2. Right-click each file → Share → Copy link
-3. Extract the file ID from the link (e.g., /d/FILE_ID/view)
-4. Create playlist.json with file IDs and names
-5. Upload playlist.json to a publicly accessible location
-6. Use the playlist.json URL in this player
+2. Make your Google Drive folder public:
+   - Right-click folder → Share
+   - Change to "Anyone with the link can view"
 
-The files themselves must be shared as "Anyone with the link can view"`;
+3. Get the folder ID:
+   - Copy the folder URL
+   - Extract ID from: drive.google.com/drive/folders/FOLDER_ID
+
+4. Enter the proxy URL and folder ID in the player
+
+The proxy server scrapes the public folder page to get MP3 file IDs,
+so no API key is needed!`;
 
             alert(helpMessage);
         }
 
-        async function loadPlaylistFromJson(playlistUrl) {
-            showStatus('Fetching playlist...', 'loading');
+        async function loadFromProxy(proxyUrl, folderId) {
+            showStatus('Fetching files from Drive...', 'loading');
 
             try {
-                const response = await fetch(playlistUrl);
+                // Remove trailing slash from proxy URL
+                proxyUrl = proxyUrl.replace(/\/$/, '');
+
+                const apiUrl = `${proxyUrl}/api/drive-files/${folderId}`;
+                console.log('Fetching from proxy:', apiUrl);
+
+                const response = await fetch(apiUrl);
 
                 if (!response.ok) {
-                    throw new Error(`Failed to fetch playlist: ${response.status}`);
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || `Proxy request failed: ${response.status}`);
                 }
 
                 const data = await response.json();
 
                 if (!Array.isArray(data) || data.length === 0) {
-                    throw new Error('Invalid playlist format. Expected an array of objects with "id" and "name" properties.');
+                    throw new Error('No MP3 files found in folder. Make sure folder is public and contains MP3 files.');
                 }
 
-                // Validate and transform the data
-                const files = [];
-                data.forEach((item, index) => {
-                    if (!item.id) {
-                        console.warn(`Skipping item at index ${index}: missing "id" property`);
-                        return;
-                    }
-
-                    files.push({
-                        id: item.id,
-                        name: item.name || `Track ${index + 1}`,
-                        url: `https://drive.google.com/uc?export=download&id=${item.id}`
-                    });
-                });
-
-                if (files.length === 0) {
-                    throw new Error('No valid tracks found in playlist.');
-                }
-
-                playlist = files;
+                // Files already have correct format from proxy
+                playlist = data;
                 renderPlaylist();
                 loadTrack(0);
                 hideStatus();
+
+                console.log(`Loaded ${playlist.length} tracks from folder ${folderId}`);
             } catch (error) {
-                showStatus(`Failed to load playlist: ${error.message}`, 'error');
-                console.error('Playlist load error:', error);
+                showStatus(`Failed to load files: ${error.message}`, 'error');
+                console.error('Proxy load error:', error);
                 throw error;
             }
         }
@@ -532,9 +562,16 @@ The files themselves must be shared as "Anyone with the link can view"`;
         });
 
         window.addEventListener('load', () => {
-            const playlistUrl = getUrlParameter('playlist');
-            if (playlistUrl) {
-                document.getElementById('albumInput').value = playlistUrl;
+            // Load saved proxy URL
+            const savedProxyUrl = localStorage.getItem('proxyUrl');
+            if (savedProxyUrl) {
+                document.getElementById('proxyUrlInput').value = savedProxyUrl;
+            }
+
+            // Auto-load if folder ID provided in URL
+            const folderParam = getUrlParameter('folder');
+            if (folderParam) {
+                document.getElementById('albumInput').value = folderParam;
                 loadAlbum();
             }
 

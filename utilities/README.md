@@ -1,184 +1,270 @@
 # Google Drive Album Player
 
-A simple, single-page web app for playing MP3 files from Google Drive - **NO API KEY REQUIRED!**
+A simple web-based MP3 player for Google Drive folders - **NO API KEY REQUIRED!**
+
+Uses a lightweight Flask proxy server to scrape public Google Drive folders and extract MP3 file information.
 
 ## Quick Start
 
-1. Upload your MP3 files to Google Drive
-2. Make each file publicly accessible ("Anyone with the link can view")
-3. Create a `playlist.json` file with your file IDs and song names
-4. Open `player.html` and paste your `playlist.json` URL
-5. Enjoy your music!
+1. **Start the proxy server:**
+   ```bash
+   cd utilities
+   pip install -r requirements.txt
+   python proxy.py
+   ```
+
+2. **Make your Google Drive folder public:**
+   - Right-click folder → Share → "Anyone with the link can view"
+
+3. **Open `player.html` in your browser**
+
+4. **Enter:**
+   - Proxy URL: `http://localhost:5000` (default)
+   - Folder ID or full Drive folder URL
+
+5. **Click "Load Album" and enjoy!**
 
 ## Setup Instructions
 
-### Step 1: Upload MP3s to Google Drive
+### 1. Install Dependencies
 
-1. Go to [Google Drive](https://drive.google.com/)
-2. Create a new folder for your album (optional but recommended)
-3. Upload your MP3 files
+```bash
+cd utilities
+pip install -r requirements.txt
+```
 
-### Step 2: Share Your Files Publicly
+This installs:
+- Flask (web framework)
+- flask-cors (for browser CORS)
+- requests (for HTTP requests)
 
-For **each MP3 file**:
-1. Right-click the file → **Get link** (or **Share**)
-2. Change access to **"Anyone with the link"** with **Viewer** permissions
-3. Click **Copy link**
-4. Save the link - you'll need the file ID from it
+### 2. Start the Proxy Server
 
-### Step 3: Extract File IDs
+```bash
+python proxy.py
+```
 
-From each share link, extract the file ID:
-- Link format: `https://drive.google.com/file/d/FILE_ID_HERE/view?usp=sharing`
-- The FILE_ID is the long string between `/d/` and `/view`
+The server starts on `http://localhost:5000` by default.
+
+**Environment variables:**
+- `PORT`: Server port (default: 5000)
+- `DEBUG`: Enable debug mode (default: False)
 
 Example:
-```
-https://drive.google.com/file/d/1a2B3c4D5e6F7g8H9i0J/view?usp=sharing
-                               ^^^^^^^^^^^^^^^^^^^
-                               This is the file ID
+```bash
+PORT=8080 DEBUG=true python proxy.py
 ```
 
-### Step 4: Create Your Playlist JSON
+### 3. Prepare Your Google Drive Folder
 
-Create a file named `playlist.json` with the following format:
+1. Create a folder in Google Drive with your MP3 files
+2. Right-click the folder → **Share**
+3. Change access to **"Anyone with the link can view"**
+4. Copy the folder URL (looks like: `https://drive.google.com/drive/folders/FOLDER_ID_HERE`)
 
+### 4. Use the Player
+
+1. Open `player.html` in your browser
+2. Enter the proxy URL (saved in localStorage after first use)
+3. Enter your Google Drive folder ID or full URL
+4. Click **Load Album**
+
+**URL parameters for auto-load:**
+```
+player.html?proxy=http://localhost:5000&folder=YOUR_FOLDER_ID
+```
+
+## How It Works
+
+1. **Proxy Server** (`proxy.py`):
+   - Receives folder ID from browser
+   - Fetches public Google Drive folder HTML
+   - Scrapes HTML to extract MP3 file IDs and names
+   - Returns clean JSON array to browser
+
+2. **Player** (`player.html`):
+   - Calls proxy API with folder ID
+   - Receives list of MP3 files
+   - Plays files using Google Drive's public download URLs
+   - Caches audio for offline playback
+
+**No API key needed!** The proxy scrapes the public folder page, which doesn't require authentication.
+
+## API Endpoints
+
+### `GET /api/drive-files/<folder_id>`
+
+Get MP3 files from a public Google Drive folder.
+
+**Response:**
 ```json
 [
   {
     "id": "1a2B3c4D5e6F7g8H9i0J",
-    "name": "Song Title 1"
-  },
-  {
-    "id": "2b3C4d5E6f7G8h9I0j1K",
-    "name": "Song Title 2"
-  },
-  {
-    "id": "3c4D5e6F7g8H9i0J1k2L",
-    "name": "Song Title 3"
+    "name": "Song Title",
+    "url": "https://drive.google.com/uc?export=download&id=1a2B3c4D5e6F7g8H9i0J"
   }
 ]
 ```
 
-**Important:**
-- Each song needs an `id` (the Google Drive file ID)
-- Each song needs a `name` (what will display in the player)
-- See `playlist.example.json` for a template
-
-### Step 5: Host Your Playlist JSON
-
-You need to make your `playlist.json` file accessible via URL. Options:
-
-**Option A: Upload to Google Drive** (simplest)
-1. Upload `playlist.json` to Google Drive
-2. Right-click → Get link → Anyone with the link
-3. Get the file ID from the share link
-4. Use this URL format: `https://drive.google.com/uc?export=download&id=YOUR_PLAYLIST_FILE_ID`
-
-**Option B: GitHub** (recommended for version control)
-1. Create a GitHub repository or use an existing one
-2. Upload `playlist.json`
-3. Use the raw file URL: `https://raw.githubusercontent.com/username/repo/branch/playlist.json`
-
-**Option C: Any other public hosting**
-- Dropbox public link
-- Your own website
-- Any service that provides a direct URL to the JSON file
-
-### Step 6: Use the Player
-
-1. Open `player.html` in your browser
-2. Paste your `playlist.json` URL in the input field
-3. Click **Load Album**
-4. Press play and enjoy!
-
-**Pro tip:** You can also use URL parameters to auto-load a playlist:
+**Example:**
+```bash
+curl http://localhost:5000/api/drive-files/YOUR_FOLDER_ID
 ```
-player.html?playlist=https://example.com/playlist.json
+
+### `GET /api/health`
+
+Health check endpoint.
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "service": "drive-proxy"
+}
+```
+
+## Deployment
+
+### Deploy to Heroku
+
+1. Create `Procfile`:
+   ```
+   web: python utilities/proxy.py
+   ```
+
+2. Deploy:
+   ```bash
+   heroku create your-app-name
+   git push heroku main
+   ```
+
+3. Use your Heroku URL as the proxy: `https://your-app-name.herokuapp.com`
+
+### Deploy to Vercel/Railway/Render
+
+All support Python Flask apps. Follow their deployment guides and point to `proxy.py`.
+
+### Deploy Locally on Network
+
+To make the proxy accessible on your local network:
+
+```bash
+python proxy.py
+# Server runs on http://0.0.0.0:5000
+# Access from other devices: http://YOUR_LOCAL_IP:5000
 ```
 
 ## Features
 
-- **No API key required!** - Simple JSON-based playlist
-- **Works offline** - Caches songs for offline playback
-- **Mobile-friendly** - Responsive design works on all devices
-- **PWA support** - Install as an app on mobile
-- **Auto-advance** - Automatically plays next track
+- **No API key required** - Scrapes public folder HTML
+- **Automatic file discovery** - No manual playlist creation
+- **Works offline** - Caches audio files
+- **Mobile-friendly** - Responsive design
+- **PWA support** - Install as app
+- **Auto-advance** - Plays next track automatically
 - **Progress tracking** - Visual progress bar
-- **Playlist management** - Click any song to jump to it
 
 ## Troubleshooting
 
-### "Failed to fetch playlist"
-- Make sure your `playlist.json` URL is publicly accessible
-- Try opening the URL directly in your browser - it should download/display the JSON
-- Check for CORS issues - some hosts may block cross-origin requests
+### "Failed to fetch folder"
+- **Check proxy is running**: `curl http://localhost:5000/api/health`
+- **Verify folder is public**: Open folder URL in incognito window
+- **CORS errors**: Make sure flask-cors is installed
 
-### "Failed to load playlist: Invalid playlist format"
-- Verify your JSON syntax is valid (use [JSONLint](https://jsonlint.com/))
-- Make sure it's an array `[ ]` of objects `{ }`
-- Each object must have an `id` property
+### "No MP3 files found"
+- Folder must contain files with `.mp3` extension
+- Files should be in the folder, not subfolders
+- Check folder ID is correct
 
 ### Songs not playing
-- Verify each MP3 file is shared as "Anyone with the link can view"
-- Make sure the file IDs are correct (extract them from the share links)
+- Files must be shared as "Anyone with the link can view"
+- Try opening the download URL directly in browser
 - Check browser console for specific errors
-- Some browsers may block autoplay - click the play button manually
 
-### CORS errors
-- If hosting `playlist.json` on your own server, ensure CORS headers are set
-- Google Drive links work well for both the playlist and audio files
-- GitHub raw URLs also work well
+### Proxy connection refused
+- Make sure proxy server is running
+- Check firewall isn't blocking port 5000
+- Verify proxy URL is correct (http://, not https://)
 
-## Updating Your Playlist
+## Development
 
-To add/remove/reorder songs:
-1. Edit your `playlist.json` file
-2. Upload the updated version (replace the old file)
-3. Reload the player page (you may need to clear cache)
+### Running in Debug Mode
 
-## Advanced Usage
-
-### Multiple Playlists
-
-Create different playlists for different albums:
-- `bhajans-morning.json`
-- `bhajans-evening.json`
-- `bhajans-special.json`
-
-Then link to them with different URLs:
-- `player.html?playlist=...bhajans-morning.json`
-- `player.html?playlist=...bhajans-evening.json`
-
-### Sharing Your Playlists
-
-Share the player with a pre-loaded playlist by sharing this URL format:
-```
-https://yoursite.com/utilities/player.html?playlist=https://example.com/yourplaylist.json
+```bash
+DEBUG=true python proxy.py
 ```
 
-## Why No API Key?
+Shows detailed request logs and Flask debug output.
 
-Previous versions of this player required a Google Drive API key, which was complicated for users to set up. The new approach:
+### Testing the Proxy
 
-- Uses a simple JSON playlist file (no API)
-- Leverages Google Drive's public download URLs
-- No authentication or API quotas to worry about
-- Works entirely in the browser
-- Simpler and more reliable!
+```bash
+# Health check
+curl http://localhost:5000/api/health
 
-The only trade-off is that you need to manually create the playlist JSON file, but for personal music collections, this is actually quite manageable.
+# Test with a folder ID
+curl http://localhost:5000/api/drive-files/YOUR_FOLDER_ID
 
-## Example Playlist
+# Pretty print JSON
+curl http://localhost:5000/api/drive-files/YOUR_FOLDER_ID | python -m json.tool
+```
 
-See `playlist.example.json` for a working example of the playlist format.
+### Improving Scraping
+
+The proxy uses regex patterns to extract file IDs from the Drive folder HTML. If Google changes their HTML structure, you may need to update the patterns in `proxy.py`:
+
+```python
+# Look for patterns in the HTML
+pattern1 = r'\["([a-zA-Z0-9_-]{25,})","([^"]*\.mp3[^"]*)"'
+```
+
+## Security Notes
+
+- Proxy only accesses public Google Drive folders
+- No authentication or API keys stored
+- No user data collected
+- CORS enabled for browser requests
+- Only returns MP3 files from specified folders
+
+## Why This Approach?
+
+**Alternative approaches:**
+1. ❌ **Google Drive API** - Requires API key setup, quotas, complexity
+2. ❌ **Manual JSON playlist** - Requires manually listing all file IDs
+3. ✅ **Proxy scraping** - Simple, automatic, no auth required!
+
+**Trade-offs:**
+- ✅ No API key management
+- ✅ Automatic file discovery
+- ✅ Simple setup
+- ⚠️ Requires running a proxy server
+- ⚠️ May break if Google changes HTML structure (rare)
+
+For personal/small-scale use, this is the simplest solution!
+
+## Example Folder Structure
+
+```
+Google Drive Folder (public)
+├── 01 - Song Name.mp3
+├── 02 - Another Song.mp3
+├── 03 - Third Song.mp3
+└── 04 - Final Track.mp3
+```
+
+The player will automatically discover and play all MP3 files in order.
+
+## License
+
+MIT License - Use freely for personal and commercial projects.
 
 ## Support
 
-If you encounter issues:
-1. Check the browser console for error messages
-2. Verify all URLs are publicly accessible
-3. Ensure JSON formatting is valid
-4. Make sure Google Drive files are shared correctly
+For issues or questions:
+1. Check the browser console for errors
+2. Test the proxy API directly with curl
+3. Verify folder is publicly accessible
+4. Check proxy server logs for detailed errors
 
 Enjoy your music! 🎵
