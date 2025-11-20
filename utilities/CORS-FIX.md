@@ -15,31 +15,37 @@ This happens because the `miniurl.shalusri.com` server doesn't send proper CORS 
 
 ### Option 1: Configure miniurl.shalusri.com Server (Recommended)
 
-1. Copy the `miniurl-htaccess` file to your `miniurl.shalusri.com` server
-2. Rename it to `.htaccess`
-3. Place it in the root directory of the miniurl server
+**Your miniurl server is running Nginx**, so use the nginx configuration below.
 
-This will add the necessary CORS headers to allow cross-origin requests.
+#### For Nginx (Your Current Setup):
 
-**For Apache servers:**
-```bash
-cp utilities/miniurl-htaccess /path/to/miniurl/server/.htaccess
-```
+1. Edit your nginx configuration file (usually `/etc/nginx/sites-available/miniurl.shalusri.com`)
+2. Add the CORS headers to your location block as shown in `miniurl-nginx.conf`
+3. Reload nginx: `sudo nginx -t && sudo systemctl reload nginx`
 
-**For Nginx servers:**
-Add the following to your nginx configuration:
-
+**Key configuration** (see `miniurl-nginx.conf` for full details):
 ```nginx
 location / {
-    add_header Access-Control-Allow-Origin *;
-    add_header Access-Control-Allow-Methods "GET, OPTIONS";
-    add_header Access-Control-Allow-Headers "Content-Type, Authorization";
-    add_header Access-Control-Max-Age 3600;
+    # The 'always' parameter is CRITICAL for redirects!
+    add_header 'Access-Control-Allow-Origin' '*' always;
+    add_header 'Access-Control-Allow-Methods' 'GET, OPTIONS' always;
+    add_header 'Access-Control-Allow-Headers' 'Origin, Content-Type, Accept' always;
 
-    if ($request_method = OPTIONS) {
-        return 200;
+    if ($request_method = 'OPTIONS') {
+        return 204;
     }
+
+    # Your existing redirect configuration
 }
+```
+
+**Why 'always' is required:** Without the `always` parameter, nginx only adds headers to 200 responses. The `always` parameter ensures CORS headers are included in redirect responses (307, 302, etc.), which is essential for JavaScript fetch() to work.
+
+#### For Apache servers (Alternative):
+
+If you were using Apache, you would use the `miniurl-htaccess` file:
+```bash
+cp utilities/miniurl-htaccess /path/to/miniurl/server/.htaccess
 ```
 
 ### Option 2: Use Google Drive URLs Directly
@@ -72,17 +78,30 @@ After applying the CORS configuration:
 
 ## Verification
 
-To verify CORS headers are working, check the response headers from miniurl.shalusri.com:
+To verify CORS headers are working after applying the nginx configuration:
 
 ```bash
 curl -I -H "Origin: https://bhajans.shalusri.com" https://miniurl.shalusri.com/bhajanamala37
 ```
 
-You should see:
+**Before the fix**, you'll see:
 ```
-Access-Control-Allow-Origin: *
-Access-Control-Allow-Methods: GET, OPTIONS
+HTTP/2 307
+server: nginx
+location: https://drive.google.com/drive/...
+(NO Access-Control headers)
 ```
+
+**After the fix**, you should see:
+```
+HTTP/2 307
+server: nginx
+access-control-allow-origin: *
+access-control-allow-methods: GET, OPTIONS
+location: https://drive.google.com/drive/...
+```
+
+The key is that `access-control-allow-origin` appears in the 307 redirect response.
 
 ## Additional Notes
 
