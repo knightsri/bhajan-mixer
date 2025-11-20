@@ -250,11 +250,11 @@
 <body>
     <div class="container">
         <div class="input-section" id="inputSection">
-            <h2 style="margin-bottom: 20px; color: #333; text-align: center;">Enter Album</h2>
-            <input type="text" id="albumInput" placeholder="Album name or Google Drive folder ID/URL">
+            <h2 style="margin-bottom: 20px; color: #333; text-align: center;">Google Drive Album Player</h2>
+            <input type="text" id="albumInput" placeholder="Google Drive folder ID or URL">
             <button onclick="loadAlbum()">Load Album</button>
             <div style="margin-top: 15px; text-align: center; font-size: 12px; color: #666;">
-                Enter album name, Drive folder ID, or full Drive folder URL
+                Enter a Google Drive folder ID or the full Drive folder URL
             </div>
         </div>
 
@@ -282,9 +282,6 @@
     <audio id="audio" preload="auto"></audio>
 
     <script>
-        const _0x4a2b = ['bWluaXVybC5zaGFsdXNyaS5jb20='];
-        const _0x1f3d = atob(_0x4a2b[0]);
-
         let playlist = [];
         let currentIndex = 0;
         let isPlaying = false;
@@ -371,7 +368,7 @@
             const album = albumInput.value.trim() || getUrlParameter('album');
 
             if (!album) {
-                showStatus('Please enter an album name', 'error');
+                showStatus('Please enter a Google Drive folder ID or URL', 'error');
                 return;
             }
 
@@ -380,39 +377,15 @@
             try {
                 let driveId = null;
 
-                // Check if input is already a Drive URL or ID
+                // Check if input is a Drive URL or ID
                 if (album.includes('drive.google.com')) {
                     driveId = extractDriveId(album);
                 } else if (album.match(/^[a-zA-Z0-9_-]{25,}$/)) {
                     // Looks like a Drive folder ID
                     driveId = album;
                 } else {
-                    // Try to fetch via miniurl
-                    try {
-                        const shortUrl = `${'https'}://${_0x1f3d}/${album}`;
-                        const response = await fetch(shortUrl, {
-                            redirect: 'follow',
-                            mode: 'cors'
-                        });
-
-                        const finalUrl = response.url;
-
-                        if (!finalUrl.includes('drive.google.com')) {
-                            throw new Error('Invalid redirect');
-                        }
-
-                        driveId = extractDriveId(finalUrl);
-                    } catch (corsError) {
-                        if (corsError.name === 'TypeError' && corsError.message.includes('CORS')) {
-                            showStatus(
-                                'Unable to load album by name. Please use a Google Drive folder URL or ID instead.',
-                                'error'
-                            );
-                            console.error('CORS error - use Drive URL/ID directly');
-                            return;
-                        }
-                        throw corsError;
-                    }
+                    showStatus('Please enter a valid Google Drive folder URL or ID', 'error');
+                    return;
                 }
 
                 if (!driveId) {
@@ -425,9 +398,7 @@
                 document.getElementById('player').classList.add('active');
                 hideStatus();
             } catch (error) {
-                if (!error.message.includes('CORS')) {
-                    showStatus('Failed to load album. Please check the input and try again.', 'error');
-                }
+                showStatus('Failed to load album. Please check the input and try again.', 'error');
                 console.error('Load error:', error);
             }
         }
