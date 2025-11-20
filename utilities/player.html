@@ -405,12 +405,10 @@
                     } catch (corsError) {
                         if (corsError.name === 'TypeError' && corsError.message.includes('CORS')) {
                             showStatus(
-                                'CORS error: Please configure miniurl.shalusri.com server with proper CORS headers. ' +
-                                'See utilities/miniurl-htaccess for configuration. ' +
-                                'Or use a Google Drive folder URL/ID directly.',
+                                'Unable to load album by name. Please use a Google Drive folder URL or ID instead.',
                                 'error'
                             );
-                            console.error('CORS configuration needed on miniurl server');
+                            console.error('CORS error - use Drive URL/ID directly');
                             return;
                         }
                         throw corsError;
