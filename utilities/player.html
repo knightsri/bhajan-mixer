@@ -251,10 +251,11 @@
     <div class="container">
         <div class="input-section" id="inputSection">
             <h2 style="margin-bottom: 20px; color: #333; text-align: center;">Google Drive Album Player</h2>
-            <input type="text" id="albumInput" placeholder="Google Drive folder ID or URL">
+            <input type="text" id="albumInput" placeholder="URL to playlist.json file">
             <button onclick="loadAlbum()">Load Album</button>
             <div style="margin-top: 15px; text-align: center; font-size: 12px; color: #666;">
-                Enter a Google Drive folder ID or the full Drive folder URL
+                Enter the URL to your playlist.json file<br>
+                <a href="#" onclick="showHelp(); return false;" style="color: #667eea;">How to create a playlist.json?</a>
             </div>
         </div>
 
@@ -362,94 +363,81 @@
 
         async function loadAlbum() {
             const albumInput = document.getElementById('albumInput');
-            const album = albumInput.value.trim() || getUrlParameter('album');
+            const playlistUrl = albumInput.value.trim() || getUrlParameter('playlist');
 
-            if (!album) {
-                showStatus('Please enter a Google Drive folder ID or URL', 'error');
+            if (!playlistUrl) {
+                showStatus('Please enter a playlist.json URL', 'error');
                 return;
             }
 
             showStatus('Loading album...', 'loading');
 
             try {
-                let driveId = null;
-
-                // Check if input is a Drive URL or ID
-                if (album.includes('drive.google.com')) {
-                    driveId = extractDriveId(album);
-                } else if (album.match(/^[a-zA-Z0-9_-]{25,}$/)) {
-                    // Looks like a Drive folder ID
-                    driveId = album;
-                } else {
-                    showStatus('Please enter a valid Google Drive folder URL or ID', 'error');
-                    return;
-                }
-
-                if (!driveId) {
-                    throw new Error('Could not extract Drive folder ID');
-                }
-
-                await loadDriveFolder(driveId);
+                await loadPlaylistFromJson(playlistUrl);
 
                 document.getElementById('inputSection').style.display = 'none';
                 document.getElementById('player').classList.add('active');
                 hideStatus();
             } catch (error) {
-                showStatus('Failed to load album. Please check the input and try again.', 'error');
+                showStatus('Failed to load playlist. Make sure the JSON file is accessible and properly formatted.', 'error');
                 console.error('Load error:', error);
             }
         }
 
-        function extractDriveId(url) {
-            const patterns = [
-                /\/folders\/([a-zA-Z0-9_-]+)/,
-                /id=([a-zA-Z0-9_-]+)/,
-                /[-\w]{25,}/
-            ];
+        function showHelp() {
+            const helpMessage = `Create a playlist.json file with this format:
 
-            for (const pattern of patterns) {
-                const match = url.match(pattern);
-                if (match) return match[1] || match[0];
-            }
-            return null;
+[
+  {"id": "FILE_ID_1", "name": "Song Name 1"},
+  {"id": "FILE_ID_2", "name": "Song Name 2"}
+]
+
+Steps:
+1. Upload MP3s to Google Drive
+2. Right-click each file → Share → Copy link
+3. Extract the file ID from the link (e.g., /d/FILE_ID/view)
+4. Create playlist.json with file IDs and names
+5. Upload playlist.json to a publicly accessible location
+6. Use the playlist.json URL in this player
+
+The files themselves must be shared as "Anyone with the link can view"`;
+
+            alert(helpMessage);
         }
 
-        async function loadDriveFolder(folderId) {
-            showStatus('Fetching files...', 'loading');
+        async function loadPlaylistFromJson(playlistUrl) {
+            showStatus('Fetching playlist...', 'loading');
 
             try {
-                // Use Google Drive API to list files in the public folder
-                // You need to replace this with your own API key from Google Cloud Console
-                // Create one at: https://console.cloud.google.com/apis/credentials
-                const API_KEY = 'YOUR_GOOGLE_DRIVE_API_KEY_HERE';
-
-                const apiUrl = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents&key=${API_KEY}&fields=files(id,name,mimeType)&orderBy=name`;
-
-                const response = await fetch(apiUrl);
+                const response = await fetch(playlistUrl);
 
                 if (!response.ok) {
-                    throw new Error(`API request failed: ${response.status}`);
+                    throw new Error(`Failed to fetch playlist: ${response.status}`);
                 }
 
                 const data = await response.json();
-                const files = [];
 
-                // Filter for audio files
-                if (data.files && data.files.length > 0) {
-                    data.files.forEach(file => {
-                        // Check if it's an audio file
-                        if (file.mimeType && file.mimeType.startsWith('audio/')) {
-                            files.push({
-                                id: file.id,
-                                name: file.name.replace(/\.(mp3|m4a|wav|ogg|flac)$/i, ''),
-                                url: `https://drive.google.com/uc?export=download&id=${file.id}`
-                            });
-                        }
-                    });
+                if (!Array.isArray(data) || data.length === 0) {
+                    throw new Error('Invalid playlist format. Expected an array of objects with "id" and "name" properties.');
                 }
 
+                // Validate and transform the data
+                const files = [];
+                data.forEach((item, index) => {
+                    if (!item.id) {
+                        console.warn(`Skipping item at index ${index}: missing "id" property`);
+                        return;
+                    }
+
+                    files.push({
+                        id: item.id,
+                        name: item.name || `Track ${index + 1}`,
+                        url: `https://drive.google.com/uc?export=download&id=${item.id}`
+                    });
+                });
+
                 if (files.length === 0) {
-                    throw new Error('No audio files found in this folder. Make sure the folder is publicly accessible.');
+                    throw new Error('No valid tracks found in playlist.');
                 }
 
                 playlist = files;
@@ -457,8 +445,9 @@
                 loadTrack(0);
                 hideStatus();
             } catch (error) {
-                showStatus('Failed to load files from Drive folder. Check that the folder is public and you have a valid API key.', 'error');
-                console.error('Drive load error:', error);
+                showStatus(`Failed to load playlist: ${error.message}`, 'error');
+                console.error('Playlist load error:', error);
+                throw error;
             }
         }
 
@@ -543,9 +532,9 @@
         });
 
         window.addEventListener('load', () => {
-            const album = getUrlParameter('album');
-            if (album) {
-                document.getElementById('albumInput').value = album;
+            const playlistUrl = getUrlParameter('playlist');
+            if (playlistUrl) {
+                document.getElementById('albumInput').value = playlistUrl;
                 loadAlbum();
             }
 
