@@ -280,7 +280,13 @@ function getErrorPage(errorMessage, folderId) {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#667eea">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="apple-touch-icon" href="./icon-192.png">
     <title>Error Loading Folder - Google Drive MP3 Player</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -422,6 +428,15 @@ function getErrorPage(errorMessage, folderId) {
             ${folderId ? `<a href="/refresh/${folderId}" class="btn btn-secondary">🔄 Retry</a>` : ''}
         </div>
     </div>
+
+    <script>
+        // Register service worker for PWA support
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js')
+                .then(reg => console.log('SW registered', reg))
+                .catch(err => console.log('SW registration failed', err));
+        }
+    </script>
 </body>
 </html>`;
 }
@@ -434,7 +449,13 @@ function getLandingPage() {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#667eea">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="apple-touch-icon" href="./icon-192.png">
     <title>Google Drive MP3 Player</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -543,6 +564,13 @@ function getLandingPage() {
             if (folderId) {
                 window.location.href = '/?folder=' + folderId;
             }
+        }
+
+        // Register service worker for PWA support
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js')
+                .then(reg => console.log('SW registered', reg))
+                .catch(err => console.log('SW registration failed', err));
         }
     </script>
 </body>
