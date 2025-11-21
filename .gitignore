@@ -10,6 +10,15 @@ output/
 # YouTube download cache
 .YTCACHE/
 
+# Utilities player cache
+utilities/cache/*
+!utilities/cache/.gitkeep
+
+# === Node.js ===
+# Dependencies
+node_modules/
+package-lock.json
+
 # === Python ===
 # Byte-compiled / optimized / DLL files
 __pycache__/
