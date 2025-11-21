@@ -198,8 +198,10 @@ function extractMp3Files(html) {
   const files = [];
   const seen = new Set();
 
-  // Multiple patterns to handle different Google Drive HTML structures
-  const patterns = [
+  console.log('Attempting to extract MP3 files with multiple patterns...');
+
+  // Strategy 1: Try old regex patterns for backwards compatibility
+  const oldPatterns = [
     // Pattern 1: Original format ["fileId","filename.mp3",...]
     /\["([a-zA-Z0-9_-]{25,})","([^"]*\.mp3[^"]*)"/gi,
     // Pattern 2: Single quotes variant ['fileId','filename.mp3',...]
@@ -210,54 +212,103 @@ function extractMp3Files(html) {
     /["']([a-zA-Z0-9_-]{33})["'][,\s]*["']([^"']*\.mp3[^"']*)["']/gi
   ];
 
-  console.log('Attempting to extract MP3 files with multiple patterns...');
-
-  // Try each pattern
-  patterns.forEach((pattern, index) => {
-    pattern.lastIndex = 0; // Reset regex state
+  // Try old patterns first
+  oldPatterns.forEach((pattern, index) => {
+    pattern.lastIndex = 0;
     let match;
     let patternMatches = 0;
 
     while ((match = pattern.exec(html)) !== null) {
       const [, fileId, filename] = match;
-
-      // Skip duplicates
       if (seen.has(fileId)) continue;
       seen.add(fileId);
 
-      // Clean up filename
       const cleanName = filename.replace(/\.mp3$/i, '');
-
       files.push({
         id: fileId,
         name: cleanName,
-        url: `https://drive.google.com/uc?export=download&id=${fileId}`
+        url: `https://drive.usercontent.google.com/download?id=${fileId}&export=download`
       });
-
       patternMatches++;
     }
 
     if (patternMatches > 0) {
-      console.log(`✓ Pattern ${index + 1} found ${patternMatches} files`);
+      console.log(`✓ Old pattern ${index + 1} found ${patternMatches} files`);
     }
   });
+
+  // Strategy 2: New format - two-pass extraction for current Google Drive HTML
+  // Current format uses data-id="FILE_ID" with filenames in separate elements
+  if (files.length === 0) {
+    console.log('Trying two-pass extraction strategy for current Google Drive format...');
+
+    // Pass 1: Find all data-id attributes for documents
+    const dataIdPattern = /data-id="([a-zA-Z0-9_-]{25,})"[^>]*data-target="doc"/g;
+    const fileIds = [];
+    let match;
+
+    while ((match = dataIdPattern.exec(html)) !== null) {
+      const fileId = match[1];
+      if (!seen.has(fileId)) {
+        seen.add(fileId);
+        fileIds.push({id: fileId, index: match.index});
+      }
+    }
+
+    console.log(`  Found ${fileIds.length} unique file IDs`);
+
+    // Pass 2: For each file ID, find the corresponding .mp3 filename nearby
+    const filenamePatterns = [
+      />([^<]*\.mp3)</i,
+      /aria-label="[^"]*?([^"]*\.mp3)"/i,
+      /data-tooltip="[^"]*?([^"]*\.mp3)"/i
+    ];
+
+    for (const {id, index} of fileIds) {
+      // Look within 5000 characters after the data-id
+      const snippet = html.substring(index, index + 5000);
+
+      // Try to find .mp3 filename in this snippet
+      let filename = null;
+      for (const pattern of filenamePatterns) {
+        const m = snippet.match(pattern);
+        if (m) {
+          filename = m[1].replace(/^Audio:\s*/i, '').trim();
+          break;
+        }
+      }
+
+      if (filename) {
+        const cleanName = filename.replace(/\.mp3$/i, '');
+        files.push({
+          id: id,
+          name: cleanName,
+          url: `https://drive.usercontent.google.com/download?id=${id}&export=download`
+        });
+      }
+    }
+
+    if (files.length > 0) {
+      console.log(`✓ Two-pass extraction found ${files.length} files`);
+    }
+  }
 
   // Log total found
   console.log(`Total unique MP3 files found: ${files.length}`);
 
-  // If no files found, try to debug
+  // If still no files found, debug
   if (files.length === 0) {
     const mp3Count = (html.match(/\.mp3/gi) || []).length;
     console.log(`Debug: Found ${mp3Count} .mp3 occurrences in HTML`);
 
     // Check for common file ID patterns
-    const fileIdPattern = /["'\[]([a-zA-Z0-9_-]{28,40})["',\]]/g;
+    const fileIdPattern = /\[\[null,"([a-zA-Z0-9_-]{25,})"\]/g;
     const potentialIds = new Set();
     let match;
     while ((match = fileIdPattern.exec(html)) !== null) {
       potentialIds.add(match[1]);
     }
-    console.log(`Debug: Found ${potentialIds.size} potential file IDs`);
+    console.log(`Debug: Found ${potentialIds.size} potential file IDs with [[null,"ID"]] pattern`);
 
     // Sample some .mp3 references
     const lines = html.split('\n').filter(line => line.toLowerCase().includes('.mp3')).slice(0, 3);

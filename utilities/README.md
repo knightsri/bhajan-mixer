@@ -6,6 +6,31 @@ Server-side caching architecture: fetches Google Drive folder contents once, cac
 
 ## Quick Start
 
+### Option 1: Docker (Recommended - Easiest!)
+
+**Windows:**
+```bash
+cd utilities
+run-docker.bat
+```
+
+**Linux/Mac:**
+```bash
+cd utilities
+chmod +x run-docker.sh
+./run-docker.sh
+```
+
+**Or with Docker Compose:**
+```bash
+cd utilities
+docker-compose up -d
+```
+
+Then open `http://localhost:3099` in your browser!
+
+### Option 2: Node.js (Traditional)
+
 1. **Install dependencies:**
    ```bash
    cd utilities
