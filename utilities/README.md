@@ -139,6 +139,34 @@ Force refresh a folder's cache (re-fetch from Google Drive).
 }
 ```
 
+### `GET /debug/<folder_id>`
+
+Debug endpoint for troubleshooting MP3 extraction issues. Fetches the folder HTML, saves it for inspection, and returns detailed extraction information.
+
+**Response:**
+```json
+{
+  "success": true,
+  "folderId": "YOUR_FOLDER_ID",
+  "htmlLength": 123456,
+  "filesFound": 5,
+  "files": [...],
+  "debugHtmlSaved": "/path/to/cache/debug-FOLDER_ID.html",
+  "mp3Occurrences": 10
+}
+```
+
+**Usage:**
+```bash
+curl http://localhost:3099/debug/YOUR_FOLDER_ID
+```
+
+This endpoint is useful when the regular extraction fails, as it provides:
+- How many `.mp3` occurrences exist in the HTML
+- Which regex patterns successfully matched files
+- Debug logs showing extraction details
+- Saved HTML file for manual inspection
+
 ### `GET /health`
 
 Health check endpoint.
@@ -216,11 +244,27 @@ npm start
 - **Check folder is public**: Open folder URL in incognito window
 - **Verify folder ID**: Make sure you copied the correct ID
 - **Check server logs**: Look for error messages in terminal
+- **Use debug endpoint**: `GET /debug/<folder_id>` to see detailed extraction info
 
 ### "No MP3 files found"
-- Folder must contain files with `.mp3` extension
+- Folder must contain files with `.mp3` extension (case-insensitive)
 - Files should be directly in the folder (not subfolders)
-- Folder must be publicly accessible
+- Folder must be publicly accessible ("Anyone with the link can view")
+- **Use debug endpoint** to see how many .mp3 occurrences were found:
+  ```bash
+  curl http://localhost:3099/debug/YOUR_FOLDER_ID
+  ```
+- Check server logs for pattern matching results
+- The app now tries multiple regex patterns to handle different Google Drive HTML formats
+
+### Improved Error Handling (v2.0)
+
+The app now includes:
+- **Styled error pages** with helpful troubleshooting tips
+- **Multiple regex patterns** for better compatibility with Google Drive HTML changes
+- **Debug logging** showing which patterns matched and how many files found
+- **Debug endpoint** (`/debug/<folder_id>`) for deep troubleshooting
+- **Helpful error messages** with specific solutions for common issues
 
 ### "Failed to load playlist"
 - Server may not have cached the folder yet
@@ -234,8 +278,33 @@ npm start
 
 ### Server won't start
 - Make sure dependencies are installed: `npm install`
-- Check port 3000 isn't already in use
+- Check port 3099 isn't already in use
 - Try a different port: `PORT=8080 npm start`
+
+### Advanced Debugging
+
+If extraction is failing:
+
+1. **Check debug endpoint**:
+   ```bash
+   curl http://localhost:3099/debug/YOUR_FOLDER_ID | jq
+   ```
+
+2. **Inspect saved HTML**:
+   ```bash
+   cat utilities/cache/debug-YOUR_FOLDER_ID.html | grep -i "\.mp3"
+   ```
+
+3. **Check server logs** - The app now logs:
+   - Which regex patterns found matches
+   - Total .mp3 occurrences in HTML
+   - Sample lines containing .mp3 references
+   - Potential file IDs found
+
+4. **Try force refresh**:
+   ```bash
+   curl http://localhost:3099/refresh/YOUR_FOLDER_ID
+   ```
 
 ## Development
 
@@ -283,11 +352,25 @@ curl http://localhost:3099/refresh/YOUR_FOLDER_ID
 
 ### Improving Scraping
 
-The server uses regex patterns to extract file IDs from Drive HTML. If Google changes their HTML structure, update the pattern in `server.js`:
+The server uses **multiple regex patterns** to extract file IDs from Drive HTML, making it more resilient to Google Drive HTML structure changes. Current patterns in `server.js`:
 
 ```javascript
-const pattern = /\["([a-zA-Z0-9_-]{25,})","([^"]*\.mp3[^"]*)"/gi;
+const patterns = [
+  // Pattern 1: Original format ["fileId","filename.mp3",...]
+  /\["([a-zA-Z0-9_-]{25,})","([^"]*\.mp3[^"]*)"/gi,
+  // Pattern 2: Single quotes variant ['fileId','filename.mp3',...]
+  /\['([a-zA-Z0-9_-]{25,})','([^']*\.mp3[^']*)'/gi,
+  // Pattern 3: With escaped quotes [\"fileId\",\"filename.mp3\",...]
+  /\[\\?"([a-zA-Z0-9_-]{25,})\\?",\\?"([^"]*\.mp3[^"]*)\\?"/gi,
+  // Pattern 4: Data structure format (33-char IDs)
+  /["']([a-zA-Z0-9_-]{33})["'][,\s]*["']([^"']*\.mp3[^"']*)["']/gi
+];
 ```
+
+If extraction fails, use the `/debug/<folder_id>` endpoint to:
+1. See which patterns matched
+2. Inspect the raw HTML structure
+3. Add new patterns if needed
 
 ## Security Notes
 

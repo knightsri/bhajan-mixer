@@ -47,11 +47,7 @@ app.get('/', async (req, res) => {
     res.send(modifiedHtml);
   } catch (error) {
     console.error('Error loading folder:', error);
-    res.status(500).send(`
-      <h1>Error Loading Folder</h1>
-      <p>${error.message}</p>
-      <a href="/">Go Back</a>
-    `);
+    res.status(500).send(getErrorPage(error.message, folderId));
   }
 });
 
@@ -80,6 +76,50 @@ app.get('/refresh/:folderId', async (req, res) => {
     res.json({ success: true, message: 'Folder cache refreshed' });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Debug endpoint - saves raw HTML for troubleshooting
+ */
+app.get('/debug/:folderId', async (req, res) => {
+  const { folderId } = req.params;
+
+  try {
+    const url = `https://drive.google.com/drive/folders/${folderId}`;
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+
+    if (!response.ok) {
+      return res.status(response.status).json({
+        error: `Failed to fetch folder: ${response.status}`,
+        folderId
+      });
+    }
+
+    const html = await response.text();
+
+    // Save HTML for inspection
+    const debugPath = path.join(CACHE_DIR, `debug-${folderId}.html`);
+    fs.writeFileSync(debugPath, html);
+
+    // Try extraction
+    const files = extractMp3Files(html);
+
+    res.json({
+      success: true,
+      folderId,
+      htmlLength: html.length,
+      filesFound: files.length,
+      files: files,
+      debugHtmlSaved: debugPath,
+      mp3Occurrences: (html.match(/\.mp3/gi) || []).length
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message, folderId });
   }
 });
 
@@ -158,28 +198,232 @@ function extractMp3Files(html) {
   const files = [];
   const seen = new Set();
 
-  // Pattern to match file entries: ["fileId","filename.mp3",...]
-  const pattern = /\["([a-zA-Z0-9_-]{25,})","([^"]*\.mp3[^"]*)"/gi;
-  let match;
+  // Multiple patterns to handle different Google Drive HTML structures
+  const patterns = [
+    // Pattern 1: Original format ["fileId","filename.mp3",...]
+    /\["([a-zA-Z0-9_-]{25,})","([^"]*\.mp3[^"]*)"/gi,
+    // Pattern 2: Single quotes variant ['fileId','filename.mp3',...]
+    /\['([a-zA-Z0-9_-]{25,})','([^']*\.mp3[^']*)'/gi,
+    // Pattern 3: With escaped quotes [\"fileId\",\"filename.mp3\",...]
+    /\[\\?"([a-zA-Z0-9_-]{25,})\\?",\\?"([^"]*\.mp3[^"]*)\\?"/gi,
+    // Pattern 4: Data structure format with file IDs and names separately
+    /["']([a-zA-Z0-9_-]{33})["'][,\s]*["']([^"']*\.mp3[^"']*)["']/gi
+  ];
 
-  while ((match = pattern.exec(html)) !== null) {
-    const [, fileId, filename] = match;
+  console.log('Attempting to extract MP3 files with multiple patterns...');
 
-    // Skip duplicates
-    if (seen.has(fileId)) continue;
-    seen.add(fileId);
+  // Try each pattern
+  patterns.forEach((pattern, index) => {
+    pattern.lastIndex = 0; // Reset regex state
+    let match;
+    let patternMatches = 0;
 
-    // Clean up filename
-    const cleanName = filename.replace(/\.mp3$/i, '');
+    while ((match = pattern.exec(html)) !== null) {
+      const [, fileId, filename] = match;
 
-    files.push({
-      id: fileId,
-      name: cleanName,
-      url: `https://drive.google.com/uc?export=download&id=${fileId}`
-    });
+      // Skip duplicates
+      if (seen.has(fileId)) continue;
+      seen.add(fileId);
+
+      // Clean up filename
+      const cleanName = filename.replace(/\.mp3$/i, '');
+
+      files.push({
+        id: fileId,
+        name: cleanName,
+        url: `https://drive.google.com/uc?export=download&id=${fileId}`
+      });
+
+      patternMatches++;
+    }
+
+    if (patternMatches > 0) {
+      console.log(`✓ Pattern ${index + 1} found ${patternMatches} files`);
+    }
+  });
+
+  // Log total found
+  console.log(`Total unique MP3 files found: ${files.length}`);
+
+  // If no files found, try to debug
+  if (files.length === 0) {
+    const mp3Count = (html.match(/\.mp3/gi) || []).length;
+    console.log(`Debug: Found ${mp3Count} .mp3 occurrences in HTML`);
+
+    // Check for common file ID patterns
+    const fileIdPattern = /["'\[]([a-zA-Z0-9_-]{28,40})["',\]]/g;
+    const potentialIds = new Set();
+    let match;
+    while ((match = fileIdPattern.exec(html)) !== null) {
+      potentialIds.add(match[1]);
+    }
+    console.log(`Debug: Found ${potentialIds.size} potential file IDs`);
+
+    // Sample some .mp3 references
+    const lines = html.split('\n').filter(line => line.toLowerCase().includes('.mp3')).slice(0, 3);
+    if (lines.length > 0) {
+      console.log('Debug: Sample lines with .mp3:');
+      lines.forEach((line, i) => {
+        console.log(`  ${i+1}. ${line.substring(0, 200).trim()}...`);
+      });
+    }
   }
 
   return files;
+}
+
+/**
+ * Error page HTML with styling
+ */
+function getErrorPage(errorMessage, folderId) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error Loading Folder - Google Drive MP3 Player</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        .error-icon {
+            font-size: 64px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #d32f2f;
+            margin-bottom: 20px;
+            font-size: 28px;
+            text-align: center;
+        }
+        .error-message {
+            background: #ffebee;
+            border-left: 4px solid #d32f2f;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            color: #c62828;
+            line-height: 1.6;
+        }
+        .folder-id {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            margin-bottom: 20px;
+            word-break: break-all;
+            font-size: 14px;
+        }
+        .folder-id strong {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        .help {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #1565c0;
+        }
+        .help strong {
+            display: block;
+            margin-bottom: 10px;
+            color: #0d47a1;
+        }
+        .help ul {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+        .help li {
+            margin-bottom: 8px;
+        }
+        .buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            flex: 1;
+            min-width: 140px;
+            padding: 15px 20px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, opacity 0.2s;
+            text-decoration: none;
+            text-align: center;
+            display: inline-block;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            opacity: 0.9;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="error-icon">⚠️</div>
+        <h1>Error Loading Folder</h1>
+
+        <div class="error-message">
+            ${errorMessage}
+        </div>
+
+        ${folderId ? `
+        <div class="folder-id">
+            <strong>Folder ID attempted:</strong>
+            ${folderId}
+        </div>
+        ` : ''}
+
+        <div class="help">
+            <strong>💡 Common issues and solutions:</strong>
+            <ul>
+                <li><strong>Folder not public:</strong> Right-click the folder in Google Drive → Share → Change to "Anyone with the link"</li>
+                <li><strong>No MP3 files:</strong> Make sure the folder contains files with .mp3 extension (case-insensitive)</li>
+                <li><strong>Files in subfolders:</strong> MP3 files must be directly in the folder, not in nested subfolders</li>
+                <li><strong>Invalid folder ID:</strong> Check that you copied the complete folder ID from the URL</li>
+            </ul>
+        </div>
+
+        <div class="buttons">
+            <a href="/" class="btn btn-primary">← Try Another Folder</a>
+            ${folderId ? `<a href="/refresh/${folderId}" class="btn btn-secondary">🔄 Retry</a>` : ''}
+        </div>
+    </div>
+</body>
+</html>`;
 }
 
 /**
