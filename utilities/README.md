@@ -2,27 +2,49 @@
 
 A simple web-based MP3 player for Google Drive folders - **NO API KEY REQUIRED!**
 
-Uses a lightweight Flask proxy server to scrape public Google Drive folders and extract MP3 file information.
+Server-side caching architecture: fetches Google Drive folder contents once, caches them as JSON, and serves a fast player interface.
 
 ## Quick Start
 
-1. **Start the proxy server:**
+1. **Install dependencies:**
    ```bash
    cd utilities
-   pip install -r requirements.txt
-   python proxy.py
+   npm install
    ```
 
-2. **Make your Google Drive folder public:**
-   - Right-click folder → Share → "Anyone with the link can view"
+2. **Start the server:**
+   ```bash
+   npm start
+   ```
 
-3. **Open `player.html` in your browser**
+3. **Open in browser:**
+   - Navigate to `http://localhost:3099`
 
-4. **Enter:**
-   - Proxy URL: `http://localhost:5000` (default)
-   - Folder ID or full Drive folder URL
+4. **Enter your Google Drive folder URL or ID**
 
-5. **Click "Load Album" and enjoy!**
+5. **Play your music!**
+
+## How It Works
+
+### Architecture
+
+1. **User visits with folder ID**: `http://localhost:3099/?folder=<FOLDER_ID>`
+
+2. **Server checks cache**:
+   - If `cache/<folder_id>.json` exists → serve player instantly
+   - If not → fetch Google Drive folder, extract MP3 files, save to cache
+
+3. **Player loads cached JSON**: `GET /playlist/<folder_id>.json`
+
+4. **MP3s stream directly from Google Drive**
+
+### Benefits
+
+- ✅ **Cached playlists** - Server fetches Drive folder only once
+- ✅ **Fast loading** - Subsequent visits are instant
+- ✅ **No API key** - Scrapes public folder HTML
+- ✅ **Simple** - Just run one server
+- ✅ **Efficient** - No repeated Drive requests
 
 ## Setup Instructions
 
@@ -30,29 +52,27 @@ Uses a lightweight Flask proxy server to scrape public Google Drive folders and 
 
 ```bash
 cd utilities
-pip install -r requirements.txt
+npm install
 ```
 
 This installs:
-- Flask (web framework)
-- flask-cors (for browser CORS)
-- requests (for HTTP requests)
+- `express` - Web server framework
+- `node-fetch` - HTTP client for fetching Drive pages
 
-### 2. Start the Proxy Server
+### 2. Start the Server
 
 ```bash
-python proxy.py
+npm start
 ```
 
-The server starts on `http://localhost:5000` by default.
+Server runs on `http://localhost:3099` by default.
 
 **Environment variables:**
-- `PORT`: Server port (default: 5000)
-- `DEBUG`: Enable debug mode (default: False)
+- `PORT` - Server port (default: 3099)
 
 Example:
 ```bash
-PORT=8080 DEBUG=true python proxy.py
+PORT=8080 npm start
 ```
 
 ### 3. Prepare Your Google Drive Folder
@@ -60,41 +80,41 @@ PORT=8080 DEBUG=true python proxy.py
 1. Create a folder in Google Drive with your MP3 files
 2. Right-click the folder → **Share**
 3. Change access to **"Anyone with the link can view"**
-4. Copy the folder URL (looks like: `https://drive.google.com/drive/folders/FOLDER_ID_HERE`)
+4. Copy the folder URL: `https://drive.google.com/drive/folders/FOLDER_ID_HERE`
 
 ### 4. Use the Player
 
-1. Open `player.html` in your browser
-2. Enter the proxy URL (saved in localStorage after first use)
-3. Enter your Google Drive folder ID or full URL
-4. Click **Load Album**
+**Option 1: Landing page**
+1. Open `http://localhost:3099`
+2. Paste folder URL or ID
+3. Click "Load Player"
 
-**URL parameters for auto-load:**
+**Option 2: Direct link**
 ```
-player.html?proxy=http://localhost:5000&folder=YOUR_FOLDER_ID
+http://localhost:3099/?folder=YOUR_FOLDER_ID
 ```
 
-## How It Works
+## Features
 
-1. **Proxy Server** (`proxy.py`):
-   - Receives folder ID from browser
-   - Fetches public Google Drive folder HTML
-   - Scrapes HTML to extract MP3 file IDs and names
-   - Returns clean JSON array to browser
-
-2. **Player** (`player.html`):
-   - Calls proxy API with folder ID
-   - Receives list of MP3 files
-   - Plays files using Google Drive's public download URLs
-   - Caches audio for offline playback
-
-**No API key needed!** The proxy scrapes the public folder page, which doesn't require authentication.
+- **Server-side caching** - Folders cached as JSON files
+- **Instant loading** - Cached folders load immediately
+- **No API key required** - Scrapes public folder HTML
+- **Automatic file discovery** - No manual playlist creation
+- **Offline playback** - Browser caches audio files
+- **Mobile-friendly** - Responsive design
+- **PWA support** - Install as app
+- **Auto-advance** - Plays next track automatically
+- **Progress tracking** - Visual progress bar
 
 ## API Endpoints
 
-### `GET /api/drive-files/<folder_id>`
+### `GET /?folder=<folder_id>`
 
-Get MP3 files from a public Google Drive folder.
+Load player for a Google Drive folder. Server will cache the folder contents if not already cached.
+
+### `GET /playlist/<folder_id>.json`
+
+Get cached playlist JSON for a folder.
 
 **Response:**
 ```json
@@ -107,12 +127,19 @@ Get MP3 files from a public Google Drive folder.
 ]
 ```
 
-**Example:**
-```bash
-curl http://localhost:5000/api/drive-files/YOUR_FOLDER_ID
+### `GET /refresh/<folder_id>`
+
+Force refresh a folder's cache (re-fetch from Google Drive).
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Folder cache refreshed"
+}
 ```
 
-### `GET /api/health`
+### `GET /health`
 
 Health check endpoint.
 
@@ -120,8 +147,36 @@ Health check endpoint.
 ```json
 {
   "status": "ok",
-  "service": "drive-proxy"
+  "cache_dir": "/path/to/cache"
 }
+```
+
+## Cache Management
+
+### Cache Location
+
+Cached playlists are stored in `utilities/cache/`
+
+### Cache Files
+
+Each folder gets a JSON file: `cache/<folder_id>.json`
+
+### Refresh Cache
+
+To refresh a folder's cache:
+```bash
+curl http://localhost:3099/refresh/YOUR_FOLDER_ID
+```
+
+Or delete the cache file and reload:
+```bash
+rm cache/YOUR_FOLDER_ID.json
+```
+
+### Clear All Cache
+
+```bash
+rm cache/*.json
 ```
 
 ## Deployment
@@ -130,7 +185,7 @@ Health check endpoint.
 
 1. Create `Procfile`:
    ```
-   web: python utilities/proxy.py
+   web: node utilities/server.js
    ```
 
 2. Deploy:
@@ -139,109 +194,128 @@ Health check endpoint.
    git push heroku main
    ```
 
-3. Use your Heroku URL as the proxy: `https://your-app-name.herokuapp.com`
+3. Your app will be at: `https://your-app-name.herokuapp.com`
 
 ### Deploy to Vercel/Railway/Render
 
-All support Python Flask apps. Follow their deployment guides and point to `proxy.py`.
+All support Node.js apps. Configure to run `node utilities/server.js`
 
 ### Deploy Locally on Network
 
-To make the proxy accessible on your local network:
+To make accessible on your local network:
 
 ```bash
-python proxy.py
-# Server runs on http://0.0.0.0:5000
-# Access from other devices: http://YOUR_LOCAL_IP:5000
+npm start
+# Server runs on http://0.0.0.0:3099
+# Access from other devices: http://YOUR_LOCAL_IP:3000
 ```
-
-## Features
-
-- **No API key required** - Scrapes public folder HTML
-- **Automatic file discovery** - No manual playlist creation
-- **Works offline** - Caches audio files
-- **Mobile-friendly** - Responsive design
-- **PWA support** - Install as app
-- **Auto-advance** - Plays next track automatically
-- **Progress tracking** - Visual progress bar
 
 ## Troubleshooting
 
-### "Failed to fetch folder"
-- **Check proxy is running**: `curl http://localhost:5000/api/health`
-- **Verify folder is public**: Open folder URL in incognito window
-- **CORS errors**: Make sure flask-cors is installed
+### "Failed to load folder"
+- **Check folder is public**: Open folder URL in incognito window
+- **Verify folder ID**: Make sure you copied the correct ID
+- **Check server logs**: Look for error messages in terminal
 
 ### "No MP3 files found"
 - Folder must contain files with `.mp3` extension
-- Files should be in the folder, not subfolders
-- Check folder ID is correct
+- Files should be directly in the folder (not subfolders)
+- Folder must be publicly accessible
+
+### "Failed to load playlist"
+- Server may not have cached the folder yet
+- Visit `http://localhost:3099/?folder=YOUR_FOLDER_ID` first
+- Check cache directory exists: `ls utilities/cache/`
 
 ### Songs not playing
 - Files must be shared as "Anyone with the link can view"
 - Try opening the download URL directly in browser
 - Check browser console for specific errors
 
-### Proxy connection refused
-- Make sure proxy server is running
-- Check firewall isn't blocking port 5000
-- Verify proxy URL is correct (http://, not https://)
+### Server won't start
+- Make sure dependencies are installed: `npm install`
+- Check port 3000 isn't already in use
+- Try a different port: `PORT=8080 npm start`
 
 ## Development
 
-### Running in Debug Mode
+### File Structure
 
-```bash
-DEBUG=true python proxy.py
+```
+utilities/
+├── server.js          # Node.js server
+├── player.html        # Player interface
+├── package.json       # Dependencies
+├── cache/            # Cached playlists
+│   └── .gitkeep
+├── manifest.json      # PWA manifest
+├── icon-192.png      # PWA icon (small)
+├── icon-512.png      # PWA icon (large)
+└── sw.js             # Service worker
 ```
 
-Shows detailed request logs and Flask debug output.
+### Running in Development
 
-### Testing the Proxy
+```bash
+npm start
+```
+
+Server will log:
+- When folders are fetched and cached
+- When cached playlists are served
+- Any errors that occur
+
+### Testing with curl
 
 ```bash
 # Health check
-curl http://localhost:5000/api/health
+curl http://localhost:3099/health
 
-# Test with a folder ID
-curl http://localhost:5000/api/drive-files/YOUR_FOLDER_ID
+# Load and cache a folder
+curl http://localhost:3099/?folder=YOUR_FOLDER_ID
 
-# Pretty print JSON
-curl http://localhost:5000/api/drive-files/YOUR_FOLDER_ID | python -m json.tool
+# Get cached playlist
+curl http://localhost:3099/playlist/YOUR_FOLDER_ID.json
+
+# Refresh cache
+curl http://localhost:3099/refresh/YOUR_FOLDER_ID
 ```
 
 ### Improving Scraping
 
-The proxy uses regex patterns to extract file IDs from the Drive folder HTML. If Google changes their HTML structure, you may need to update the patterns in `proxy.py`:
+The server uses regex patterns to extract file IDs from Drive HTML. If Google changes their HTML structure, update the pattern in `server.js`:
 
-```python
-# Look for patterns in the HTML
-pattern1 = r'\["([a-zA-Z0-9_-]{25,})","([^"]*\.mp3[^"]*)"'
+```javascript
+const pattern = /\["([a-zA-Z0-9_-]{25,})","([^"]*\.mp3[^"]*)"/gi;
 ```
 
 ## Security Notes
 
-- Proxy only accesses public Google Drive folders
-- No authentication or API keys stored
-- No user data collected
-- CORS enabled for browser requests
+- Server only accesses public Google Drive folders
+- No authentication or API keys required
+- No user data collected or stored
 - Only returns MP3 files from specified folders
+- Cache files are stored locally on server
 
 ## Why This Approach?
 
 **Alternative approaches:**
-1. ❌ **Google Drive API** - Requires API key setup, quotas, complexity
-2. ❌ **Manual JSON playlist** - Requires manually listing all file IDs
-3. ✅ **Proxy scraping** - Simple, automatic, no auth required!
+1. ❌ **Google Drive API** - Requires API key, quotas, OAuth complexity
+2. ❌ **Manual JSON playlist** - Tedious, must update manually
+3. ❌ **Real-time scraping** - Slow, rate-limited, inefficient
+4. ✅ **Server-side caching** - Fast, simple, efficient!
 
 **Trade-offs:**
 - ✅ No API key management
 - ✅ Automatic file discovery
-- ✅ Simple setup
-- ⚠️ Requires running a proxy server
+- ✅ Fast loading (cached)
+- ✅ Efficient (scrape once, serve many)
+- ✅ Simple deployment
+- ⚠️ Requires Node.js server
+- ⚠️ Cache must be refreshed manually for folder updates
 - ⚠️ May break if Google changes HTML structure (rare)
 
-For personal/small-scale use, this is the simplest solution!
+For personal/small-scale use, this is the optimal solution!
 
 ## Example Folder Structure
 
@@ -253,7 +327,7 @@ Google Drive Folder (public)
 └── 04 - Final Track.mp3
 ```
 
-The player will automatically discover and play all MP3 files in order.
+The server will automatically discover and cache all MP3 files.
 
 ## License
 
@@ -262,9 +336,9 @@ MIT License - Use freely for personal and commercial projects.
 ## Support
 
 For issues or questions:
-1. Check the browser console for errors
-2. Test the proxy API directly with curl
-3. Verify folder is publicly accessible
-4. Check proxy server logs for detailed errors
+1. Check the server logs for errors
+2. Verify folder is publicly accessible
+3. Try refreshing the cache: `/refresh/<folder_id>`
+4. Check browser console for client-side errors
 
 Enjoy your music! 🎵

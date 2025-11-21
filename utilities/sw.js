@@ -1,7 +1,9 @@
-const CACHE_NAME = 'ap-v1';
+const CACHE_NAME = 'drive-player-v1';
 const urlsToCache = [
-  './player.html',
-  './manifest.json'
+  './',
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png'
 ];
 
 self.addEventListener('install', (event) => {
@@ -41,7 +43,7 @@ self.addEventListener('fetch', (event) => {
         });
       }).catch(() => {
         if (request.destination === 'document') {
-          return caches.match('./player.html');
+          return caches.match('./');
         }
       })
     );
