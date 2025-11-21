@@ -3,8 +3,8 @@ version: '3.8'
 services:
   gdrive-player:
     build: .
-    image: gdrive-mp3-player:latest
-    container_name: gdrive-mp3-player
+    image: gdrive-bhajan-player:latest
+    container_name: gdrive-bhajan-player
     ports:
       - "3099:3099"
     volumes:
