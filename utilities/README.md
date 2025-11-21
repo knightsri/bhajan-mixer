@@ -6,7 +6,7 @@ Uses a lightweight Flask proxy server to scrape public Google Drive folders and 
 
 ## Quick Start
 
-1. **Start the proxy server:**
+1. **Start the server:**
    ```bash
    cd utilities
    pip install -r requirements.txt
@@ -16,11 +16,10 @@ Uses a lightweight Flask proxy server to scrape public Google Drive folders and 
 2. **Make your Google Drive folder public:**
    - Right-click folder → Share → "Anyone with the link can view"
 
-3. **Open `player.html` in your browser**
+3. **Open the player in your browser:**
+   - Navigate to `http://localhost:5000`
 
-4. **Enter:**
-   - Proxy URL: `http://localhost:5000` (default)
-   - Folder ID or full Drive folder URL
+4. **Enter your Google Drive folder ID or URL**
 
 5. **Click "Load Album" and enjoy!**
 
@@ -38,13 +37,13 @@ This installs:
 - flask-cors (for browser CORS)
 - requests (for HTTP requests)
 
-### 2. Start the Proxy Server
+### 2. Start the Server
 
 ```bash
 python proxy.py
 ```
 
-The server starts on `http://localhost:5000` by default.
+The server starts on `http://localhost:5000` by default and serves both the player interface and API endpoints.
 
 **Environment variables:**
 - `PORT`: Server port (default: 5000)
@@ -64,31 +63,32 @@ PORT=8080 DEBUG=true python proxy.py
 
 ### 4. Use the Player
 
-1. Open `player.html` in your browser
-2. Enter the proxy URL (saved in localStorage after first use)
-3. Enter your Google Drive folder ID or full URL
-4. Click **Load Album**
+1. Open `http://localhost:5000` in your browser
+2. Enter your Google Drive folder ID or full URL
+3. Click **Load Album**
 
 **URL parameters for auto-load:**
 ```
-player.html?proxy=http://localhost:5000&folder=YOUR_FOLDER_ID
+http://localhost:5000?folder=YOUR_FOLDER_ID
 ```
 
 ## How It Works
 
-1. **Proxy Server** (`proxy.py`):
-   - Receives folder ID from browser
+1. **Flask Server** (`proxy.py`):
+   - Serves the player interface at `/`
+   - Provides API endpoint at `/api/drive-files/<folder_id>`
    - Fetches public Google Drive folder HTML
    - Scrapes HTML to extract MP3 file IDs and names
    - Returns clean JSON array to browser
 
 2. **Player** (`player.html`):
-   - Calls proxy API with folder ID
+   - Served directly by the Flask server
+   - Calls `/api/drive-files/` endpoint with folder ID
    - Receives list of MP3 files
    - Plays files using Google Drive's public download URLs
    - Caches audio for offline playback
 
-**No API key needed!** The proxy scrapes the public folder page, which doesn't require authentication.
+**No API key needed!** The server scrapes the public folder page, which doesn't require authentication.
 
 ## API Endpoints
 
@@ -168,7 +168,7 @@ python proxy.py
 ## Troubleshooting
 
 ### "Failed to fetch folder"
-- **Check proxy is running**: `curl http://localhost:5000/api/health`
+- **Check server is running**: `curl http://localhost:5000/api/health`
 - **Verify folder is public**: Open folder URL in incognito window
 - **CORS errors**: Make sure flask-cors is installed
 
@@ -182,10 +182,10 @@ python proxy.py
 - Try opening the download URL directly in browser
 - Check browser console for specific errors
 
-### Proxy connection refused
-- Make sure proxy server is running
+### Server connection refused
+- Make sure server is running (`python proxy.py`)
 - Check firewall isn't blocking port 5000
-- Verify proxy URL is correct (http://, not https://)
+- Verify you're accessing `http://localhost:5000` (http://, not https://)
 
 ## Development
 
@@ -232,13 +232,14 @@ pattern1 = r'\["([a-zA-Z0-9_-]{25,})","([^"]*\.mp3[^"]*)"'
 **Alternative approaches:**
 1. ❌ **Google Drive API** - Requires API key setup, quotas, complexity
 2. ❌ **Manual JSON playlist** - Requires manually listing all file IDs
-3. ✅ **Proxy scraping** - Simple, automatic, no auth required!
+3. ✅ **Server-side scraping** - Simple, automatic, no auth required!
 
 **Trade-offs:**
 - ✅ No API key management
 - ✅ Automatic file discovery
-- ✅ Simple setup
-- ⚠️ Requires running a proxy server
+- ✅ Simple setup - just run one server
+- ✅ Player and API served from same origin (no CORS issues)
+- ⚠️ Requires running a Python server
 - ⚠️ May break if Google changes HTML structure (rare)
 
 For personal/small-scale use, this is the simplest solution!

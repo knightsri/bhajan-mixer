@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
 """
-Simple Flask proxy to get MP3 files from public Google Drive folders
-without requiring API keys. Scrapes the folder HTML to extract file IDs.
+Simple Flask server to serve the player and proxy Google Drive folder requests.
+Scrapes public Google Drive folders to extract MP3 file IDs without requiring API keys.
 """
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory, send_file
 from flask_cors import CORS
 import requests
 import re
 import json
+import os
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for browser requests
+
+# Get the directory where this script is located
+UTILITIES_DIR = os.path.dirname(os.path.abspath(__file__))
 
 @app.route('/api/drive-files/<folder_id>')
 def get_drive_files(folder_id):
@@ -86,20 +90,17 @@ def health():
 
 @app.route('/')
 def index():
-    """API documentation"""
-    return jsonify({
-        'service': 'Google Drive Folder Proxy',
-        'version': '1.0',
-        'endpoints': {
-            '/api/drive-files/<folder_id>': 'Get MP3 files from a public Drive folder',
-            '/api/health': 'Health check'
-        },
-        'usage': 'GET /api/drive-files/YOUR_FOLDER_ID',
-        'note': 'Folder must be publicly accessible'
-    })
+    """Serve the player HTML"""
+    return send_file(os.path.join(UTILITIES_DIR, 'player.html'))
+
+@app.route('/<path:filename>')
+def serve_static(filename):
+    """Serve static files (manifest.json, icons, service worker, etc.)"""
+    return send_from_directory(UTILITIES_DIR, filename)
 
 if __name__ == '__main__':
-    import os
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('DEBUG', 'False').lower() == 'true'
+    print(f'Starting server on http://0.0.0.0:{port}')
+    print(f'Open http://localhost:{port} in your browser to access the player')
     app.run(host='0.0.0.0', port=port, debug=debug)

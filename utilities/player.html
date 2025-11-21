@@ -251,11 +251,10 @@
     <div class="container">
         <div class="input-section" id="inputSection">
             <h2 style="margin-bottom: 20px; color: #333; text-align: center;">Google Drive Album Player</h2>
-            <input type="text" id="proxyUrlInput" placeholder="Proxy server URL (e.g., http://localhost:5000)" style="margin-bottom: 10px;">
             <input type="text" id="albumInput" placeholder="Google Drive folder ID or URL">
             <button onclick="loadAlbum()">Load Album</button>
             <div style="margin-top: 15px; text-align: center; font-size: 12px; color: #666;">
-                Enter your proxy server URL and Google Drive folder ID/URL<br>
+                Enter a Google Drive folder ID/URL<br>
                 <a href="#" onclick="showHelp(); return false;" style="color: #667eea;">How does this work?</a>
             </div>
         </div>
@@ -364,19 +363,12 @@
 
         async function loadAlbum() {
             const albumInput = document.getElementById('albumInput');
-            const proxyUrlInput = document.getElementById('proxyUrlInput');
 
             const folderInput = albumInput.value.trim() || getUrlParameter('folder');
-            let proxyUrl = proxyUrlInput.value.trim() || getUrlParameter('proxy') || localStorage.getItem('proxyUrl') || 'http://localhost:5000';
 
             if (!folderInput) {
                 showStatus('Please enter a Google Drive folder ID or URL', 'error');
                 return;
-            }
-
-            // Save proxy URL for next time
-            if (proxyUrlInput.value.trim()) {
-                localStorage.setItem('proxyUrl', proxyUrl);
             }
 
             showStatus('Loading album...', 'loading');
@@ -392,13 +384,13 @@
                     throw new Error('Could not extract folder ID');
                 }
 
-                await loadFromProxy(proxyUrl, folderId);
+                await loadFromAPI(folderId);
 
                 document.getElementById('inputSection').style.display = 'none';
                 document.getElementById('player').classList.add('active');
                 hideStatus();
             } catch (error) {
-                showStatus('Failed to load album. Check proxy server and folder access.', 'error');
+                showStatus('Failed to load album. Check folder access.', 'error');
                 console.error('Load error:', error);
             }
         }
@@ -425,40 +417,34 @@
         function showHelp() {
             const helpMessage = `How this works:
 
-1. Run the proxy server:
-   python utilities/proxy.py
-
-2. Make your Google Drive folder public:
+1. Make your Google Drive folder public:
    - Right-click folder → Share
    - Change to "Anyone with the link can view"
 
-3. Get the folder ID:
+2. Get the folder ID:
    - Copy the folder URL
    - Extract ID from: drive.google.com/drive/folders/FOLDER_ID
 
-4. Enter the proxy URL and folder ID in the player
+3. Enter the folder ID in the player
 
-The proxy server scrapes the public folder page to get MP3 file IDs,
+The server scrapes the public folder page to get MP3 file IDs,
 so no API key is needed!`;
 
             alert(helpMessage);
         }
 
-        async function loadFromProxy(proxyUrl, folderId) {
+        async function loadFromAPI(folderId) {
             showStatus('Fetching files from Drive...', 'loading');
 
             try {
-                // Remove trailing slash from proxy URL
-                proxyUrl = proxyUrl.replace(/\/$/, '');
-
-                const apiUrl = `${proxyUrl}/api/drive-files/${folderId}`;
-                console.log('Fetching from proxy:', apiUrl);
+                const apiUrl = `/api/drive-files/${folderId}`;
+                console.log('Fetching from API:', apiUrl);
 
                 const response = await fetch(apiUrl);
 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({}));
-                    throw new Error(errorData.error || `Proxy request failed: ${response.status}`);
+                    throw new Error(errorData.error || `API request failed: ${response.status}`);
                 }
 
                 const data = await response.json();
@@ -467,7 +453,7 @@ so no API key is needed!`;
                     throw new Error('No MP3 files found in folder. Make sure folder is public and contains MP3 files.');
                 }
 
-                // Files already have correct format from proxy
+                // Files already have correct format from API
                 playlist = data;
                 renderPlaylist();
                 loadTrack(0);
@@ -476,7 +462,7 @@ so no API key is needed!`;
                 console.log(`Loaded ${playlist.length} tracks from folder ${folderId}`);
             } catch (error) {
                 showStatus(`Failed to load files: ${error.message}`, 'error');
-                console.error('Proxy load error:', error);
+                console.error('API load error:', error);
                 throw error;
             }
         }
@@ -562,12 +548,6 @@ so no API key is needed!`;
         });
 
         window.addEventListener('load', () => {
-            // Load saved proxy URL
-            const savedProxyUrl = localStorage.getItem('proxyUrl');
-            if (savedProxyUrl) {
-                document.getElementById('proxyUrlInput').value = savedProxyUrl;
-            }
-
             // Auto-load if folder ID provided in URL
             const folderParam = getUrlParameter('folder');
             if (folderParam) {
