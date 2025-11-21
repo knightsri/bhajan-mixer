@@ -1,8 +1,8 @@
 {
-  "name": "Album Player",
-  "short_name": "Player",
-  "description": "Audio player for albums",
-  "start_url": "./player.html",
+  "name": "Google Drive MP3 Player",
+  "short_name": "Drive Player",
+  "description": "Play MP3s from Google Drive folders",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#667eea",
   "theme_color": "#667eea",
@@ -21,12 +21,5 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["music", "entertainment"],
-  "share_target": {
-    "action": "./player.html",
-    "method": "GET",
-    "params": {
-      "title": "album"
-    }
-  }
+  "categories": ["music", "entertainment"]
 }
