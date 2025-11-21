@@ -195,10 +195,46 @@
         .hidden {
             display: none;
         }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            color: #333;
+            margin: 0;
+        }
+
+        .home-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: background 0.2s, transform 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .home-btn:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+        }
     </style>
 </head>
 <body>
     <div class="container">
+        <div class="header">
+            <h1>🎵 Player</h1>
+            <a href="/" class="home-btn">🏠 Home</a>
+        </div>
         <div class="player" id="player">
             <div class="now-playing">
                 <div class="track-title" id="trackTitle">Loading...</div>

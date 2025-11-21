@@ -66,6 +66,71 @@ app.get('/playlist/:folderId.json', (req, res) => {
 });
 
 /**
+ * Proxy MP3 files from Google Drive
+ * This handles the redirect and streams the audio to the browser
+ * Supports HTTP Range requests for seeking/fast-forwarding
+ */
+app.get('/stream/:fileId', async (req, res) => {
+  const { fileId } = req.params;
+
+  try {
+    const driveUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+
+    // Prepare headers for the request to Google Drive
+    const fetchHeaders = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    };
+
+    // Forward the Range header if present (for seeking)
+    if (req.headers.range) {
+      fetchHeaders['Range'] = req.headers.range;
+    }
+
+    const response = await fetch(driveUrl, {
+      method: 'GET',
+      headers: fetchHeaders,
+      redirect: 'follow' // Follow redirects automatically
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to fetch file ${fileId}: ${response.status}`);
+      return res.status(response.status).send('File not found');
+    }
+
+    // Set appropriate headers for MP3 streaming
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+
+    // Get content length and handle range requests
+    const contentLength = response.headers.get('content-length');
+    const contentRange = response.headers.get('content-range');
+
+    if (contentRange) {
+      // This is a partial response (206)
+      res.status(206);
+      res.setHeader('Content-Range', contentRange);
+      if (contentLength) {
+        res.setHeader('Content-Length', contentLength);
+      }
+    } else {
+      // Full response (200)
+      res.status(200);
+      if (contentLength) {
+        res.setHeader('Content-Length', contentLength);
+      }
+    }
+
+    // Stream the response
+    response.body.pipe(res);
+
+  } catch (error) {
+    console.error(`Error streaming file ${fileId}:`, error);
+    res.status(500).send('Error streaming file');
+  }
+});
+
+/**
  * Force refresh a folder's cache
  */
 app.get('/refresh/:folderId', async (req, res) => {
@@ -227,7 +292,7 @@ function extractMp3Files(html) {
       files.push({
         id: fileId,
         name: cleanName,
-        url: `https://drive.usercontent.google.com/download?id=${fileId}&export=download`
+        url: `/stream/${fileId}`
       });
       patternMatches++;
     }
@@ -283,7 +348,7 @@ function extractMp3Files(html) {
         files.push({
           id: id,
           name: cleanName,
-          url: `https://drive.usercontent.google.com/download?id=${id}&export=download`
+          url: `/stream/${id}`
         });
       }
     }
